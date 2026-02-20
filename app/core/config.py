@@ -6,7 +6,7 @@ class Settings(BaseSettings):
     
     # DATABASE URL (We will fill this in Phase 2)
     # Format: postgresql://user:password@localhost/dbname
-    DATABASE_URL: str = "postgresql://postgres:password@localhost/kmart_db"
+    DATABASE_URL: str = "postgresql://postgres:admin123@localhost:5432/kmart_db"
 
     class Config:
         env_file = ".env"
