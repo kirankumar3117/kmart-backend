@@ -7,7 +7,7 @@ from app.db.base import Base
 from app.api import auth, products  # <--- IMPORT THIS
 
 # Create Tables (Auto-Migration)
-from app.models import user, product # <--- IMPORT MODEL HERE TO CREATE TABLE
+from app.models import user, product, shop # <--- IMPORT MODEL HERE TO CREATE TABLE
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title=settings.PROJECT_NAME)

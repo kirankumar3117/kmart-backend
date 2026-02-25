@@ -4,9 +4,9 @@ class Settings(BaseSettings):
     PROJECT_NAME: str = "Kmart API"
     API_V1_STR: str = "/api/v1"
     
-    # DATABASE URL (We will fill this in Phase 2)
-    # Format: postgresql://user:password@localhost/dbname
-    DATABASE_URL: str = "postgresql://postgres:admin123@localhost:5432/kmart_db"
+    # By defining the type but NOT giving it a string, 
+    # Pydantic is forced to go look in the .env file for this exact variable name!
+    DATABASE_URL: str 
 
     class Config:
         env_file = ".env"
