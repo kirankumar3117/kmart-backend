@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List
 
@@ -6,10 +6,13 @@ from app.db.session import get_db
 from app.models.order import Order, OrderItem
 from app.models.inventory import InventoryItem
 from app.models.shop import Shop
+from app.models.cart_suggestion import CartSuggestion
 from app.schemas.order import OrderCreate, OrderResponse, OrderUpdate
+from app.schemas.cart_suggestion import CartSuggestionResponse
 from app.utils.auth import get_current_user
 from app.models.user import User
 from app.core.ws_manager import manager  # <--- WebSocket Manager
+from app.services.ocr import process_chitty_order  # <--- OCR Background Task
 
 
 router = APIRouter()
@@ -17,6 +20,7 @@ router = APIRouter()
 @router.post("/", response_model=OrderResponse)
 def create_order(
     order_data: OrderCreate, 
+    background_tasks: BackgroundTasks,              # <--- For OCR processing
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user) # <--- THE SECURITY BOUNCER
 ):
@@ -81,6 +85,10 @@ def create_order(
 
     db.commit()
     db.refresh(new_order)
+
+    # 5. 📸 If a chitty image was uploaded, trigger OCR in the background!
+    if order_data.list_image_url:
+        background_tasks.add_task(process_chitty_order, new_order.id)
 
     return new_order
 
@@ -167,3 +175,33 @@ def get_my_orders(
     orders = db.query(Order).filter(Order.customer_id == current_user.id).order_by(Order.created_at.desc()).all()
     
     return orders
+
+
+# ==========================================
+# GET OCR SUGGESTIONS FOR AN ORDER (Shopkeeper)
+# ==========================================
+@router.get("/{order_id}/suggestions", response_model=List[CartSuggestionResponse])
+def get_order_suggestions(
+    order_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    # 1. Verify the order exists
+    order = db.query(Order).filter(Order.id == order_id).first()
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    # 2. Role check: only the shopkeeper (or the customer themselves) can view suggestions
+    if current_user.role == "shopkeeper" or current_user.id == order.customer_id:
+        suggestions = (
+            db.query(CartSuggestion)
+            .filter(CartSuggestion.order_id == order_id)
+            .order_by(CartSuggestion.confidence.desc())
+            .all()
+        )
+        return suggestions
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to view suggestions for this order."
+        )

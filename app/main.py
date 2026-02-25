@@ -13,7 +13,7 @@ from app.api import auth, products, shops, inventory, orders, upload, ws
 # THE "UNUSED" IMPORTS (Model Registration)
 # ==========================================
 # We import these files so SQLAlchemy reads them and registers them to Base.metadata
-from app.models import user, product, shop, inventory as model_inventory, order 
+from app.models import user, product, shop, inventory as model_inventory, order, cart_suggestion 
 
 # Create Tables (Auto-Migration)
 Base.metadata.create_all(bind=engine)
