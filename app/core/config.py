@@ -1,12 +1,13 @@
 from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
-    PROJECT_NAME: str = "Kmart API"
-    API_V1_STR: str = "/api/v1"
+    PROJECT_NAME: str = "Smart Kirana"
+    DATABASE_URL: str
     
-    # By defining the type but NOT giving it a string, 
-    # Pydantic is forced to go look in the .env file for this exact variable name!
-    DATABASE_URL: str 
+    # --- ADD THESE 3 LINES FOR SECURITY ---
+    SECRET_KEY: str = "your-super-secret-key-change-this-in-production"
+    ALGORITHM: str = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7 # Token lasts for 7 days
 
     class Config:
         env_file = ".env"

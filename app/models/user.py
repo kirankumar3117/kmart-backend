@@ -11,9 +11,14 @@ class User(Base):
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True, index=True)
-    phone = Column(String, unique=True, index=True, nullable=False)
-    name = Column(String, nullable=True)
-    email = Column(String, unique=True, index=True, nullable=True)
-    hashed_password = Column(String, nullable=True)
+    full_name = Column(String, index=True, nullable=False)
+    
+    # Phone number is now the primary required field
+    phone_number = Column(String, unique=True, index=True, nullable=False)
+    
+    # Email is now completely optional
+    email = Column(String, unique=True, index=True, nullable=True) 
+    
+    hashed_password = Column(String, nullable=False)
     is_active = Column(Boolean, default=True)
-    role = Column(Enum(UserRole), default=UserRole.CUSTOMER)
+    role = Column(String, default="customer")

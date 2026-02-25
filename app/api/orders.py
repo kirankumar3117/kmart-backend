@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List
 
@@ -6,12 +6,19 @@ from app.db.session import get_db
 from app.models.order import Order, OrderItem
 from app.models.inventory import InventoryItem
 from app.models.shop import Shop
-from app.schemas.order import OrderCreate, OrderResponse
+from app.schemas.order import OrderCreate, OrderResponse, OrderUpdate
+from app.utils.auth import get_current_user
+from app.models.user import User
+
 
 router = APIRouter()
 
 @router.post("/", response_model=OrderResponse)
-def create_order(order_data: OrderCreate, db: Session = Depends(get_db)):
+def create_order(
+    order_data: OrderCreate, 
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user) # <--- THE SECURITY BOUNCER
+):
     # 1. Verify the Shop exists
     shop = db.query(Shop).filter(Shop.id == order_data.shop_id).first()
     if not shop:
@@ -23,7 +30,6 @@ def create_order(order_data: OrderCreate, db: Session = Depends(get_db)):
     # 2. Process items ONLY IF the user actually selected digital items
     if order_data.items:
         for item in order_data.items:
-            # If they provided a product_id, check the stock
             if item.product_id:
                 inventory_item = db.query(InventoryItem).filter(
                     InventoryItem.shop_id == order_data.shop_id,
@@ -33,7 +39,6 @@ def create_order(order_data: OrderCreate, db: Session = Depends(get_db)):
                 if not inventory_item:
                     raise HTTPException(status_code=400, detail=f"Product ID {item.product_id} is not sold here.")
                 
-                # Check stock limits (unless it's a custom loose request, but we'll keep it strict for now)
                 if inventory_item.stock < item.quantity:
                     raise HTTPException(status_code=400, detail=f"Not enough stock for Product ID {item.product_id}.")
 
@@ -41,10 +46,8 @@ def create_order(order_data: OrderCreate, db: Session = Depends(get_db)):
                 item_price = inventory_item.price
                 total_amount += (item_price * item.quantity)
             else:
-                # If they didn't provide a product_id, it's a purely custom line item
-                item_price = 0.0 # Shopkeeper will update this later!
+                item_price = 0.0 
 
-            # Save the parsed item data
             order_items_to_create.append({
                 "product_id": item.product_id,
                 "quantity": item.quantity,
@@ -52,9 +55,9 @@ def create_order(order_data: OrderCreate, db: Session = Depends(get_db)):
                 "special_instructions": item.special_instructions
             })
 
-    # 3. Create the Main Order (works for both normal orders AND photo orders)
+    # 3. Create the Main Order
     new_order = Order(
-        customer_id=order_data.customer_id,
+        customer_id=current_user.id, # <--- SECURELY EXTRACTED FROM THE TOKEN!
         shop_id=order_data.shop_id,
         total_amount=total_amount,
         status="pending",
@@ -64,7 +67,7 @@ def create_order(order_data: OrderCreate, db: Session = Depends(get_db)):
     db.add(new_order)
     db.flush() 
 
-    # 4. Create the Order Items (if there are any)
+    # 4. Create the Order Items
     for oi_data in order_items_to_create:
         new_order_item = OrderItem(
             order_id=new_order.id, 
@@ -79,3 +82,77 @@ def create_order(order_data: OrderCreate, db: Session = Depends(get_db)):
     db.refresh(new_order)
 
     return new_order
+
+# ==========================================
+# GET ALL ORDERS FOR A SPECIFIC SHOP
+# ==========================================
+@router.get("/shop/{shop_id}", response_model=List[OrderResponse])
+def get_shop_orders(
+    shop_id: int, 
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user) # <--- Require Token
+):
+    # 1. Role-Based Check: Are they a shopkeeper?
+    if current_user.role != "shopkeeper":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, 
+            detail="Not authorized. Shopkeeper access required."
+        )
+
+    # 2. Verify the shop exists
+    shop = db.query(Shop).filter(Shop.id == shop_id).first()
+    if not shop:
+        raise HTTPException(status_code=404, detail="Shop not found")
+        
+    # 3. Fetch orders
+    orders = db.query(Order).filter(Order.shop_id == shop_id).order_by(Order.created_at.desc()).all()
+    return orders
+
+# ==========================================
+# UPDATE ORDER STATUS & FINAL AMOUNT (Protected)
+# ==========================================
+@router.patch("/{order_id}", response_model=OrderResponse)
+def update_order(
+    order_id: int, 
+    update_data: OrderUpdate, 
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user) # <--- Require Token
+):
+    # 1. Role-Based Check
+    if current_user.role != "shopkeeper":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, 
+            detail="Not authorized. Shopkeeper access required."
+        )
+
+    # 2. Find the order
+    order = db.query(Order).filter(Order.id == order_id).first()
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    # 3. Update the data
+    if update_data.status is not None:
+        order.status = update_data.status
+        
+    if update_data.total_amount is not None:
+        order.total_amount = update_data.total_amount
+
+    # 4. Save to database
+    db.commit()
+    db.refresh(order)
+    
+    return order
+
+
+# ==========================================
+# GET CUSTOMER'S OWN ORDERS (My Orders)
+# ==========================================
+@router.get("/me", response_model=List[OrderResponse])
+def get_my_orders(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user) # <--- Require Token
+):
+    # Fetch all orders where the customer_id matches the logged-in user's token
+    orders = db.query(Order).filter(Order.customer_id == current_user.id).order_by(Order.created_at.desc()).all()
+    
+    return orders

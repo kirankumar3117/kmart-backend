@@ -22,7 +22,6 @@ class OrderItemResponse(BaseModel):
 
 # 2. The main Checkout Payload
 class OrderCreate(BaseModel):
-    customer_id: int
     shop_id: int
     
     # NEW: Link to the handwritten list photo
@@ -47,3 +46,10 @@ class OrderResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+class OrderUpdate(BaseModel):
+    status: Optional[str] = None
+    # This is crucial for the chitty workflow! The shopkeeper calculates 
+    # the loose items/photo list and enters the final real total here.
+    total_amount: Optional[float] = None
+
