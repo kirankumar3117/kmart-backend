@@ -15,8 +15,13 @@ from app.api import auth, products, shops, inventory, orders, upload, ws
 # We import these files so SQLAlchemy reads them and registers them to Base.metadata
 from app.models import user, product, shop, inventory as model_inventory, order, cart_suggestion 
 
-# Create Tables (Auto-Migration)
-Base.metadata.create_all(bind=engine)
+# ==========================================
+# TABLE MIGRATIONS (Powered by Alembic)
+# ==========================================
+# Previously: Base.metadata.create_all(bind=engine)
+# Now we use Alembic! Run migrations with:
+#   alembic revision --autogenerate -m "describe your change"
+#   alembic upgrade head
 
 app = FastAPI(title=settings.PROJECT_NAME)
 
