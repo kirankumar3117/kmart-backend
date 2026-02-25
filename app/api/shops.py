@@ -1,12 +1,13 @@
 from app.utils.auth import get_current_user
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 from typing import List
 
 from app.db.session import get_db
 from app.models.shop import Shop
 from app.models.user import User
-from app.schemas.shop import ShopCreate, ShopResponse
+from app.schemas.shop import ShopCreate, ShopResponse, ShopNearbyResponse
 
 router = APIRouter()
 
@@ -36,6 +37,61 @@ def create_shop(
     db.refresh(db_shop)
     
     return db_shop
+
+# ==========================================
+# GET NEARBY SHOPS (Public: Customers find shops near them!)
+# ==========================================
+# Uses the Haversine Formula to calculate distance in kilometers
+# Formula: d = 2R × arcsin(√(sin²((Δlat)/2) + cos(lat1)·cos(lat2)·sin²((Δlng)/2)))
+# ==========================================
+@router.get("/nearby", response_model=List[ShopNearbyResponse])
+def get_nearby_shops(
+    user_lat: float = Query(..., description="User's latitude"),
+    user_lng: float = Query(..., description="User's longitude"),
+    radius_km: float = Query(10.0, description="Search radius in kilometers (default: 10km)"),
+    skip: int = 0,
+    limit: int = 100,
+    db: Session = Depends(get_db)
+):
+    # Earth's radius in kilometers
+    R = 6371.0
+
+    # Build the Haversine distance expression using PostgreSQL math functions
+    dlat = func.radians(Shop.latitude - user_lat)
+    dlng = func.radians(Shop.longitude - user_lng)
+    
+    a = (
+        func.power(func.sin(dlat / 2), 2) +
+        func.cos(func.radians(user_lat)) *
+        func.cos(func.radians(Shop.latitude)) *
+        func.power(func.sin(dlng / 2), 2)
+    )
+    
+    distance = R * 2 * func.atan2(func.sqrt(a), func.sqrt(1 - a))
+
+    # Query: select shops + computed distance, filter within radius, sort by nearest
+    results = (
+        db.query(Shop, distance.label("distance_km"))
+        .filter(
+            Shop.is_active == True,
+            Shop.latitude.isnot(None),     # Skip shops without coordinates
+            Shop.longitude.isnot(None),
+            distance <= radius_km           # Only within the radius
+        )
+        .order_by(distance)                 # Nearest first
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
+
+    # Merge the Shop fields + distance_km into a single response
+    nearby_shops = []
+    for shop, dist in results:
+        shop_data = ShopNearbyResponse.model_validate(shop)
+        shop_data.distance_km = round(dist, 2)  # Round to 2 decimal places
+        nearby_shops.append(shop_data)
+
+    return nearby_shops
 
 # ==========================================
 # GET ALL SHOPS (Public: Customers need to see shops!)

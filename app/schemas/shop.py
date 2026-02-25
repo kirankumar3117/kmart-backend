@@ -20,3 +20,7 @@ class ShopResponse(ShopBase):
 
     class Config:
         from_attributes = True
+
+# Response for the /nearby endpoint — includes how far the shop is
+class ShopNearbyResponse(ShopResponse):
+    distance_km: float  # Distance from the user in kilometers
