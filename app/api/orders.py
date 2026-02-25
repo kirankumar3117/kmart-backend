@@ -9,6 +9,7 @@ from app.models.shop import Shop
 from app.schemas.order import OrderCreate, OrderResponse, OrderUpdate
 from app.utils.auth import get_current_user
 from app.models.user import User
+from app.core.ws_manager import manager  # <--- WebSocket Manager
 
 
 router = APIRouter()
@@ -109,10 +110,10 @@ def get_shop_orders(
     return orders
 
 # ==========================================
-# UPDATE ORDER STATUS & FINAL AMOUNT (Protected)
+# UPDATE ORDER STATUS & FINAL AMOUNT (Protected + WebSocket Push)
 # ==========================================
 @router.patch("/{order_id}", response_model=OrderResponse)
-def update_order(
+async def update_order(
     order_id: int, 
     update_data: OrderUpdate, 
     db: Session = Depends(get_db),
@@ -140,6 +141,16 @@ def update_order(
     # 4. Save to database
     db.commit()
     db.refresh(order)
+    
+    # 5. 🔔 Push real-time update to the customer via WebSocket!
+    await manager.send_to_user(order.customer_id, {
+        "type": "order_update",
+        "order_id": order.id,
+        "shop_id": order.shop_id,
+        "status": order.status,
+        "total_amount": order.total_amount,
+        "updated_at": str(order.created_at),
+    })
     
     return order
 

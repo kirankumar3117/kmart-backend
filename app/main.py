@@ -7,7 +7,7 @@ from app.db.session import engine
 from app.db.base import Base
 
 # Import Routers
-from app.api import auth, products, shops, inventory, orders, upload 
+from app.api import auth, products, shops, inventory, orders, upload, ws 
 
 # ==========================================
 # THE "UNUSED" IMPORTS (Model Registration)
@@ -38,3 +38,8 @@ app.include_router(shops.router, prefix="/api/v1/shops", tags=["Shops"])
 app.include_router(inventory.router, prefix="/api/v1/inventory", tags=["Inventory"])
 app.include_router(orders.router, prefix="/api/v1/orders", tags=["Orders"])
 app.include_router(upload.router, prefix="/api/v1/upload", tags=["Uploads"])
+
+# ==========================================
+# WEBSOCKET ROUTES (Real-time updates)
+# ==========================================
+app.include_router(ws.router, prefix="/ws", tags=["WebSocket"])
