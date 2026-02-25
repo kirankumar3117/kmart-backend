@@ -6,12 +6,12 @@ class Shop(Base):
 
     id = Column(Integer, primary_key=True, index=True)
 
+    # Linked to the user table
     owner_id = Column(Integer, ForeignKey("users.id"), nullable=False)
 
     name = Column(String, nullable=False)
-
+    category = Column(String, nullable=False) 
     address = Column(Text, nullable=False)
-
     is_active = Column(Boolean, default=True)
 
     latitude = Column(Float, nullable=True)

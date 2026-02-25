@@ -3,18 +3,20 @@ from typing import Optional
 
 class ShopBase(BaseModel):
     name: str
-    address: str
-    is_active: bool
-    latitude: float
-    longitude: float
+    category: str
+    address: str  # Made strictly required to match DB nullable=False
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    is_active: Optional[bool] = True
 
 class ShopCreate(ShopBase):
-    owner_id: int
+    # We purposely do NOT put owner_id here. 
+    # The frontend shouldn't send it; the backend token will provide it!
+    pass 
 
 class ShopResponse(ShopBase):
     id: int
-    owner_id: int
-    is_active: bool
+    owner_id: int # The frontend gets to see who owns it in the response
 
     class Config:
         from_attributes = True
