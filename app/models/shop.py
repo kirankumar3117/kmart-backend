@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, Text
+from sqlalchemy import Column, Integer, String, Boolean, Text, Float, ForeignKey
 from app.db.base import Base
 
 class Shop(Base):
