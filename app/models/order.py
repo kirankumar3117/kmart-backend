@@ -11,7 +11,12 @@ class Order(Base):
     shop_id = Column(Integer, ForeignKey("shops.id"), nullable=False)
     
     total_amount = Column(Float, default=0.0)
-    status = Column(String, default="pending") 
+    status = Column(String, default="pending")
+
+    # Pre-order & pickup fields
+    order_type = Column(String, default="instant")  # "instant" | "pre_order"
+    scheduled_pickup_time = Column(DateTime(timezone=True), nullable=True)
+    estimated_preparation_minutes = Column(Integer, nullable=True)
     
     # NEW: Store the URL of the uploaded handwritten list or image
     list_image_url = Column(String, nullable=True) 

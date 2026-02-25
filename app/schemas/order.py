@@ -30,6 +30,10 @@ class OrderCreate(BaseModel):
     # NEW: General instructions ("Deliver after 5 PM", "Call when downstairs")
     order_notes: Optional[str] = None
     
+    # Pre-order & pickup fields
+    order_type: str = "instant"                         # "instant" or "pre_order"
+    scheduled_pickup_time: Optional[datetime] = None    # Required when order_type="pre_order"
+
     # Now Optional: Because a user can checkout with ONLY an image and 0 items!
     items: Optional[List[OrderItemCreate]] = [] 
 
@@ -41,6 +45,9 @@ class OrderResponse(BaseModel):
     status: str
     list_image_url: Optional[str] = None
     order_notes: Optional[str] = None
+    order_type: str
+    scheduled_pickup_time: Optional[datetime] = None
+    estimated_preparation_minutes: Optional[int] = None
     created_at: datetime
     items: List[OrderItemResponse]
 
@@ -52,4 +59,6 @@ class OrderUpdate(BaseModel):
     # This is crucial for the chitty workflow! The shopkeeper calculates 
     # the loose items/photo list and enters the final real total here.
     total_amount: Optional[float] = None
+    # Shopkeeper sets how long to prepare the order
+    estimated_preparation_minutes: Optional[int] = None
 
