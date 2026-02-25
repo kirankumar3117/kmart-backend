@@ -180,6 +180,9 @@ erDiagram
         string status
         string list_image_url
         string order_notes
+        string order_type
+        datetime scheduled_pickup_time
+        int estimated_preparation_minutes
         datetime created_at
     }
     ORDER_ITEM {
@@ -235,9 +238,9 @@ erDiagram
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| `POST` | `/` | 🔒 Customer | Place an order (digital items + optional image list) |
-| `GET` | `/shop/{shop_id}` | 🔒 Shopkeeper | View all orders for a specific shop |
-| `PATCH` | `/{order_id}` | 🔒 Shopkeeper | Update order status / total amount |
+| `POST` | `/` | 🔒 Customer | Place an order (instant or pre-order, digital items + optional image list) |
+| `GET` | `/shop/{shop_id}` | 🔒 Shopkeeper | View all orders for a specific shop, with filters for `order_type` and `status` |
+| `PATCH` | `/{order_id}` | 🔒 Shopkeeper | Update order status, total amount, or estimated prep time |
 | `GET` | `/me` | 🔒 Logged-in | View customer's own order history |
 
 ### 📸 Upload — `/api/v1/upload`
@@ -245,6 +248,17 @@ erDiagram
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
 | `POST` | `/` | Public | Upload an image file → returns `/static/{filename}` URL |
+
+---
+
+## 🔔 Real-Time Notifications & Pre-Orders
+
+Smart Kirana features a **WebSocket-powered notification system** and supports **scheduled pre-orders**:
+
+1. **Pre-Orders**: Customers can place an order with `order_type="pre_order"` and a `scheduled_pickup_time`.
+2. **Shopkeeper Alerts**: The moment an order is placed, the shopkeeper receives a real-time `new_order` WebSocket ping.
+3. **Pickup Ready**: When the shopkeeper marks the order as `"ready"` and sets an `estimated_preparation_minutes`, the customer receives a `pickup_ready` WebSocket notification to come collect their items.
+4. **OCR Processing**: Shopkeepers also receive `chitty_processed` alerts when the background OCR engine finishes scanning a handwritten list component of an order.
 
 ---
 
