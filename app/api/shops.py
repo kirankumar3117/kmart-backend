@@ -7,9 +7,58 @@ from typing import List
 from app.db.session import get_db
 from app.models.shop import Shop
 from app.models.user import User
+from app.models.inventory import InventoryItem
+from app.models.product import Product
 from app.schemas.shop import ShopCreate, ShopResponse, ShopNearbyResponse
+from app.schemas.inventory import ShopItemResponse
 
 router = APIRouter()
+
+# ==========================================
+# GET SHOP ITEMS (Public: Joined Product + Inventory view)
+# ==========================================
+@router.get("/{shop_id}/items", response_model=List[ShopItemResponse])
+def get_shop_items(
+    shop_id: int,
+    skip: int = 0,
+    limit: int = 100,
+    db: Session = Depends(get_db)
+):
+    # 1. Verify the shop exists
+    shop = db.query(Shop).filter(Shop.id == shop_id).first()
+    if not shop:
+        raise HTTPException(status_code=404, detail="Shop not found")
+
+    # 2. Join InventoryItem with Product to get full product details + shop pricing
+    results = (
+        db.query(InventoryItem, Product)
+        .join(Product, InventoryItem.product_id == Product.id)
+        .filter(
+            InventoryItem.shop_id == shop_id,
+            InventoryItem.stock > 0,        # Only in-stock items
+            Product.is_active == True        # Only active products
+        )
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
+
+    # 3. Flatten the joined rows into a single response object
+    shop_items = []
+    for inv, prod in results:
+        shop_items.append(ShopItemResponse(
+            inventory_id=inv.id,
+            product_id=prod.id,
+            product_name=prod.name,
+            category=prod.category,
+            image_url=prod.image_url,
+            mrp=prod.mrp,
+            unit=prod.unit,
+            price=inv.price,
+            stock=inv.stock,
+        ))
+
+    return shop_items
 
 # ==========================================
 # CREATE A SHOP (Protected: Shopkeepers Only)

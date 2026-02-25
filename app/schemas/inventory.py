@@ -24,3 +24,16 @@ class InventoryResponse(InventoryBase):
 class InventoryUpdate(BaseModel):
     price: Optional[float] = None
     stock: Optional[int] = None
+
+# 5. Joined response: Product details + shop-specific price/stock
+#    Used by GET /shops/{shop_id}/items
+class ShopItemResponse(BaseModel):
+    inventory_id: int       # InventoryItem.id
+    product_id: int
+    product_name: str
+    category: Optional[str] = None
+    image_url: Optional[str] = None
+    mrp: float              # Max Retail Price (from master catalog)
+    unit: Optional[str] = None
+    price: float            # This shop's selling price
+    stock: int              # This shop's current stock
