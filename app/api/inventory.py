@@ -1,3 +1,4 @@
+from app.schemas.inventory import InventoryUpdate
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List
@@ -49,3 +50,23 @@ def get_shop_inventory(shop_id: int, skip: int = 0, limit: int = 100, db: Sessio
     # 2. Fetch all inventory items linked to this specific shop_id
     inventory = db.query(InventoryItem).filter(InventoryItem.shop_id == shop_id).offset(skip).limit(limit).all()
     return inventory
+
+@router.patch("/{item_id}", response_model=InventoryResponse)
+def update_inventory(item_id: int, update_data: InventoryUpdate, db: Session = Depends(get_db)):
+    # 1. Find the specific inventory item on the shelf
+    inventory_item = db.query(InventoryItem).filter(InventoryItem.id == item_id).first()
+    
+    if not inventory_item:
+        raise HTTPException(status_code=404, detail="Inventory item not found")
+        
+    # 2. Update only the fields that were provided in the request
+    if update_data.price is not None:
+        inventory_item.price = update_data.price
+    if update_data.stock is not None:
+        inventory_item.stock = update_data.stock
+        
+    # 3. Save the changes to the database
+    db.commit()
+    db.refresh(inventory_item)
+    
+    return inventory_item

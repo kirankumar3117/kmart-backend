@@ -1,4 +1,5 @@
 from pydantic import BaseModel
+from typing import Optional
 
 # 1. The core fields we always need
 class InventoryBase(BaseModel):
@@ -18,3 +19,8 @@ class InventoryResponse(InventoryBase):
 
     class Config:
         from_attributes = True
+
+# 4. What the frontend sends when updating (everything is optional)
+class InventoryUpdate(BaseModel):
+    price: Optional[float] = None
+    stock: Optional[int] = None
