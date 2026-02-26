@@ -49,7 +49,7 @@ class OrderResponse(BaseModel):
     scheduled_pickup_time: Optional[datetime] = None
     estimated_preparation_minutes: Optional[int] = None
     created_at: datetime
-    items: List[OrderItemResponse]
+    items: List[OrderItemResponse] = []
 
     class Config:
         from_attributes = True

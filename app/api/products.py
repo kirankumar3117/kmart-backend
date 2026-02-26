@@ -1,3 +1,4 @@
+from app.utils.auth import get_current_user
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from typing import List, Optional
@@ -8,20 +9,34 @@ from app.schemas.product import ProductCreate, ProductResponse
 
 router = APIRouter()
 
-# 1. CREATE PRODUCT (Admin Side)
+# ==========================================
+# CREATE MASTER PRODUCT (Protected: Admin Only)
+# ==========================================
 @router.post("/", response_model=ProductResponse)
-def create_product(item: ProductCreate, db: Session = Depends(get_db)):
-    # Check for duplicate barcode if provided
-    if item.barcode:
-        existing = db.query(Product).filter(Product.barcode == item.barcode).first()
+def create_product(
+    product: ProductCreate, 
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user) # <--- Require Token
+):
+    # 1. Strict Role Check: Only admins can touch the master catalog
+    if current_user.role != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only administrators can add master products."
+        )
+        
+    # 2. Check for duplicate barcode if provided
+    if product.barcode:
+        existing = db.query(Product).filter(Product.barcode == product.barcode).first()
         if existing:
-            raise HTTPException(status_code=400, detail="Product with this barcode exists")
-    
-    db_product = Product(**item.dict())
-    db.add(db_product)
+            raise HTTPException(status_code=400, detail="Product with this barcode already exists.")
+
+    new_product = Product(**product.model_dump())
+    db.add(new_product)
     db.commit()
-    db.refresh(db_product)
-    return db_product
+    db.refresh(new_product)
+    
+    return new_product
 
 # 2. SEARCH / LIST PRODUCTS (Customer Side)
 # Usage: /products?search=soap&category=Personal Care

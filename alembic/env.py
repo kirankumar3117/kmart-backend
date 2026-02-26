@@ -12,7 +12,7 @@ from app.core.config import settings
 from app.db.base import Base
 
 # Import ALL models so Alembic can detect them for autogenerate
-from app.models import user, product, shop, inventory, order, cart_suggestion
+from app.models import user, product, shop, inventory, order, cart_suggestion, agent
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

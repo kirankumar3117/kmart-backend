@@ -37,3 +37,5 @@ class ShopItemResponse(BaseModel):
     unit: Optional[str] = None
     price: float            # This shop's selling price
     stock: int              # This shop's current stock
+    class Config:
+        from_attributes = True

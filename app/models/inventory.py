@@ -1,4 +1,5 @@
 from sqlalchemy import Column, Integer, Float, ForeignKey
+from sqlalchemy.dialects.postgresql import UUID
 from app.db.base import Base
 
 class InventoryItem(Base):
@@ -7,7 +8,7 @@ class InventoryItem(Base):
     id = Column(Integer, primary_key=True, index=True)
 
     # The Bridge Connections
-    shop_id = Column(Integer, ForeignKey("shops.id"), nullable=False)
+    shop_id = Column(UUID(as_uuid=True), ForeignKey("shops.id"), nullable=False)
     product_id = Column(Integer, ForeignKey("products.id"), nullable=False)
     
     # Store-specific details

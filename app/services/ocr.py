@@ -125,10 +125,20 @@ def process_chitty_order(order_id: int):
             return
         
         # Convert the URL path ("/static/chitty_abc.jpg") to a file path ("uploads/chitty_abc.jpg")
+        # 1. Strip the '/static/' prefix
         image_filename = order.list_image_url.replace("/static/", "")
+        
+        # 2. STRIP ANY LEADING SLASHES so os.path.join works correctly
+        image_filename = image_filename.lstrip("/") 
+        
+        # 3. Safely join the path
         image_path = os.path.join("uploads", image_filename)
         
+        # Add a quick debug print so you can see it working in your terminal!
+        print(f"🤖 OCR Starting: Reading image from {image_path}") 
+        
         if not os.path.exists(image_path):
+            print(f"❌ OCR Error: File not found at {image_path}") # This helps immensely with debugging
             return
         
         # 2. Extract text from the image
