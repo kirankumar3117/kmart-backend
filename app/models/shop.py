@@ -9,6 +9,7 @@ from app.db.base import Base
 class OnboardingStep(str, enum.Enum):
     REGISTERED = "registered"
     VERIFIED = "verified"
+    PIN_SET = "pin_set"
     COMPLETED = "completed"
 
 
@@ -37,6 +38,9 @@ class Shop(Base):
     is_verified = Column(Boolean, default=False)
     is_onboarded = Column(Boolean, default=False)
     is_online = Column(Boolean, default=False)
+
+    # PIN-based auth
+    hashed_pin = Column(String, nullable=True)
 
     # Onboarding progress tracking
     onboarding_step = Column(

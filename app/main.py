@@ -1,6 +1,8 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.exceptions import RequestValidationError
 import os
 
 from app.core.config import settings
@@ -38,6 +40,46 @@ app.add_middleware(
     allow_headers=["*"],  # Allows all headers (like our Authorization Bearer token)
 )
 
+
+# ==========================================
+# GLOBAL ERROR HANDLERS
+# Override FastAPI defaults so all errors return a flat, consistent shape:
+#   { "success": false, "message": "...", "code": "..." }
+# ==========================================
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException):
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={
+            "success": False,
+            "message": exc.detail if isinstance(exc.detail, str) else str(exc.detail),
+        },
+    )
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    # FastAPI's default returns an array of error objects.
+    # We flatten it to a single human-readable message string.
+    errors = exc.errors()
+    if errors:
+        first = errors[0]
+        field = " → ".join(str(loc) for loc in first.get("loc", []) if loc != "body")
+        msg = first.get("msg", "Validation error")
+        message = f"{field}: {msg}" if field else msg
+    else:
+        message = "Invalid request data"
+
+    return JSONResponse(
+        status_code=422,
+        content={
+            "success": False,
+            "message": message,
+            "code": "VALIDATION_ERROR",
+        },
+    )
+
+
 # ==========================================
 # FILE UPLOADS SETUP
 # ==========================================
@@ -46,6 +88,7 @@ os.makedirs("uploads", exist_ok=True)
 
 # 2. Tell FastAPI to serve files from this folder at the "/static" URL
 app.mount("/static", StaticFiles(directory="uploads"), name="static")
+
 
 # ==========================================
 # REGISTER ROUTES
@@ -59,6 +102,7 @@ app.include_router(upload.router, prefix="/api/v1/upload", tags=["Uploads"])
 
 # Onboarding routes (register, setup, status)
 app.include_router(onboarding.router, prefix="/api/v1/shops", tags=["Onboarding"])
+
 
 # ==========================================
 # WEBSOCKET ROUTES (Real-time updates)

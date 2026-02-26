@@ -11,10 +11,16 @@ from app.models.shop import Shop, OnboardingStep
 from app.models.agent import Agent
 from app.schemas.user import UserCreate, UserResponse
 from app.schemas.onboarding import (
+    CheckPhoneRequest,
+    CheckPhoneResponse,
+    CheckPhoneData,
+    LoginPinRequest,
     VerifyAgentRequest,
     SendOTPRequest,
     VerifyOTPRequest,
-    VerifyResponse,
+    SetPinRequest,
+    SetPinResponse,
+    SetPinData,
 )
 from app.core.security import (
     verify_password,
@@ -23,6 +29,7 @@ from app.core.security import (
     get_password_hash,
 )
 from app.core.config import settings
+from app.utils.shop_auth import get_current_shop
 
 router = APIRouter()
 
@@ -31,7 +38,66 @@ _otp_store: dict[str, str] = {}
 
 
 # ==========================================
-# REGISTER NEW USER (existing endpoint)
+# CHECK PHONE STATUS (Public — no auth)
+# Returns the status string the frontend uses to route to the right screen:
+#   new_user   → [register screen]
+#   registered → [verify screen]
+#   verified   → [set-pin screen]
+#   pin_set    → [shop-setup screen]
+#   active     → [login/home screen]
+# ==========================================
+@router.post("/check-status")
+def check_phone_status(body: CheckPhoneRequest, db: Session = Depends(get_db)):
+    shop = db.query(Shop).filter(Shop.phone == body.phone).first()
+
+    if not shop:
+        return CheckPhoneResponse(
+            data=CheckPhoneData(status="new_user", phone=body.phone)
+        )
+
+    # Map OnboardingStep enum → frontend status string
+    step_to_status = {
+        OnboardingStep.REGISTERED: "registered",
+        OnboardingStep.VERIFIED: "verified",
+        OnboardingStep.PIN_SET: "pin_set",
+        OnboardingStep.COMPLETED: "active",
+    }
+    user_status = step_to_status.get(shop.onboarding_step, "registered")
+
+    return CheckPhoneResponse(
+        data=CheckPhoneData(
+            status=user_status,
+            shop_id=str(shop.id),
+            shop_name=shop.shop_name,
+            phone=shop.phone,
+        )
+    )
+
+
+# ==========================================
+# LOGIN WITH PIN (for returning users)
+# ==========================================
+@router.post("/login-pin")
+def login_pin(body: LoginPinRequest, db: Session = Depends(get_db)):
+    shop = db.query(Shop).filter(Shop.phone == body.phone).first()
+
+    if not shop or not shop.hashed_pin:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect phone or PIN",
+        )
+
+    if not verify_password(body.pin, shop.hashed_pin):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect PIN",
+        )
+
+    return _build_verify_response(shop)
+
+
+# ==========================================
+# REGISTER NEW USER (existing endpoint — legacy, kept for compatibility)
 # ==========================================
 @router.post("/register", response_model=UserResponse)
 def register_user(user_data: UserCreate, db: Session = Depends(get_db)):
@@ -59,7 +125,7 @@ def register_user(user_data: UserCreate, db: Session = Depends(get_db)):
 
 
 # ==========================================
-# LOGIN (existing endpoint)
+# LOGIN (existing endpoint — legacy)
 # ==========================================
 @router.post("/login")
 def login(login_data: UserLogin, db: Session = Depends(get_db)):
@@ -80,7 +146,8 @@ def login(login_data: UserLogin, db: Session = Depends(get_db)):
 
 
 # ==========================================
-# STEP 2a: VERIFY VIA AGENT CODE
+# HELPER: Build standard verification response
+# Used by: verify-otp, verify-agent, login-pin
 # ==========================================
 def _build_verify_response(shop: Shop) -> dict:
     """Helper: builds the standard verification response with tokens."""
@@ -94,27 +161,29 @@ def _build_verify_response(shop: Shop) -> dict:
                 "id": str(shop.id),
                 "phone": shop.phone,
                 "name": shop.owner_name,
+                "email": shop.email,
                 "role": "shopkeeper",
-                "is_verified": shop.is_verified,
+                "isVerified": shop.is_verified,   # camelCase — matches frontend expectation
             },
             "tokens": {
                 "access_token": access_token,
                 "refresh_token": refresh_token,
-                "expires_in": settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,  # seconds
+                "expires_in": settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
             },
             "onboarding_step": shop.onboarding_step.value,
         },
     }
 
 
+# ==========================================
+# VERIFY VIA AGENT CODE (Public — no auth)
+# ==========================================
 @router.post("/verify-agent")
 def verify_agent(body: VerifyAgentRequest, db: Session = Depends(get_db)):
-    # 1. Look up shop by phone
     shop = db.query(Shop).filter(Shop.phone == body.phone).first()
     if not shop:
         raise HTTPException(status_code=404, detail="Shop not found. Please register first.")
 
-    # 2. Validate agent code
     agent = (
         db.query(Agent)
         .filter(Agent.agent_code == body.agent_code, Agent.is_active == True)
@@ -126,7 +195,6 @@ def verify_agent(body: VerifyAgentRequest, db: Session = Depends(get_db)):
             detail="Invalid or inactive agent code",
         )
 
-    # 3. Mark shop as verified
     shop.is_verified = True
     shop.onboarding_step = OnboardingStep.VERIFIED
     shop.agent_id = agent.id
@@ -138,16 +206,15 @@ def verify_agent(body: VerifyAgentRequest, db: Session = Depends(get_db)):
 
 
 # ==========================================
-# STEP 2b: SEND OTP (fallback)
+# SEND OTP (Public — no auth)
+# Called automatically after /shops/register and by the Resend button
 # ==========================================
 @router.post("/send-otp")
 def send_otp(body: SendOTPRequest, db: Session = Depends(get_db)):
-    # Validate shop exists
     shop = db.query(Shop).filter(Shop.phone == body.phone).first()
     if not shop:
         raise HTTPException(status_code=404, detail="Shop not found. Please register first.")
 
-    # Generate 4-digit OTP
     otp = str(random.randint(1000, 9999))
     _otp_store[body.phone] = otp
 
@@ -156,22 +223,22 @@ def send_otp(body: SendOTPRequest, db: Session = Depends(get_db)):
 
     return {
         "success": True,
-        "message": "OTP sent successfully",
-        "dev_otp": otp,  # Remove in production!
+        "data": {
+            "message": "OTP sent successfully",
+            "dev_otp": otp,   # Remove in production!
+        },
     }
 
 
 # ==========================================
-# STEP 2c: VERIFY OTP (fallback)
+# VERIFY OTP (Public — no auth)
 # ==========================================
 @router.post("/verify-otp")
 def verify_otp(body: VerifyOTPRequest, db: Session = Depends(get_db)):
-    # 1. Look up shop
     shop = db.query(Shop).filter(Shop.phone == body.phone).first()
     if not shop:
         raise HTTPException(status_code=404, detail="Shop not found. Please register first.")
 
-    # 2. Validate OTP
     stored_otp = _otp_store.get(body.phone)
     if not stored_otp or stored_otp != body.otp:
         raise HTTPException(
@@ -179,10 +246,8 @@ def verify_otp(body: VerifyOTPRequest, db: Session = Depends(get_db)):
             detail="Invalid or expired OTP",
         )
 
-    # 3. Clear used OTP
     del _otp_store[body.phone]
 
-    # 4. Mark shop as verified (same as agent-code flow)
     shop.is_verified = True
     shop.onboarding_step = OnboardingStep.VERIFIED
 
@@ -190,3 +255,33 @@ def verify_otp(body: VerifyOTPRequest, db: Session = Depends(get_db)):
     db.refresh(shop)
 
     return _build_verify_response(shop)
+
+
+# ==========================================
+# SET PIN (Authenticated — Bearer token required)
+# Step 3 of the onboarding flow: sets and hashes the 4-digit PIN
+# ==========================================
+@router.post("/set-pin")
+def set_pin(
+    body: SetPinRequest,
+    db: Session = Depends(get_db),
+    current_shop: Shop = Depends(get_current_shop),
+):
+    if not current_shop.is_verified:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Please verify your phone number before setting a PIN",
+        )
+
+    current_shop.hashed_pin = get_password_hash(body.pin)
+    current_shop.onboarding_step = OnboardingStep.PIN_SET
+
+    db.commit()
+    db.refresh(current_shop)
+
+    return SetPinResponse(
+        data=SetPinData(
+            message="PIN set successfully",
+            onboarding_step=current_shop.onboarding_step.value,
+        )
+    )

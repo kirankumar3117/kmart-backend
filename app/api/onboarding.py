@@ -1,6 +1,5 @@
 import os
 import uuid
-import shutil
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, status
 from sqlalchemy.orm import Session
@@ -8,6 +7,7 @@ from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.models.shop import Shop, OnboardingStep
 from app.utils.shop_auth import get_current_shop
+from app.core.security import get_password_hash
 from app.schemas.onboarding import (
     ShopRegisterRequest,
     ShopRegisterResponse,
@@ -25,22 +25,22 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 
 # ==========================================
-# STEP 1: REGISTER SHOP (Public — no auth)
+# STEP 1: REGISTER SHOP (Public — no auth, no PIN)
+# After creation, OTP is sent via /auth/send-otp (called automatically by the app)
 # ==========================================
 @router.post("/register")
 def register_shop(body: ShopRegisterRequest, db: Session = Depends(get_db)):
-    # Check if phone already exists
     existing = db.query(Shop).filter(Shop.phone == body.phone).first()
 
     if existing:
-        # Already fully onboarded → error
+        # Fully onboarded → tell app to navigate to login
         if existing.onboarding_step == OnboardingStep.COMPLETED:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Already registered. Please login.",
             )
 
-        # Incomplete onboarding → return current progress so mobile app can resume
+        # Incomplete onboarding — return current progress so app can resume
         return ShopRegisterResponse(
             data=ShopRegisterData(
                 shop_id=str(existing.id),
@@ -62,6 +62,9 @@ def register_shop(body: ShopRegisterRequest, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(new_shop)
 
+    # Note: OTP is triggered by the frontend calling POST /auth/send-otp
+    # immediately after this response (verify screen auto-calls it on mount)
+
     return ShopRegisterResponse(
         data=ShopRegisterData(
             shop_id=str(new_shop.id),
@@ -72,7 +75,8 @@ def register_shop(body: ShopRegisterRequest, db: Session = Depends(get_db)):
 
 
 # ==========================================
-# STEP 3: SHOP SETUP (Authenticated — Bearer token)
+# STEP 4: SHOP SETUP (Authenticated — Bearer token)
+# Content-Type: multipart/form-data
 # ==========================================
 @router.post("/setup")
 def shop_setup(
@@ -84,11 +88,10 @@ def shop_setup(
     db: Session = Depends(get_db),
     current_shop: Shop = Depends(get_current_shop),
 ):
-    # Validate file types and sizes
     max_size = 5 * 1024 * 1024  # 5MB
 
-    shop_image_url = None
-    owner_image_url = None
+    shop_image_url = current_shop.shop_image_url
+    owner_image_url = current_shop.owner_image_url
 
     if shop_image and shop_image.filename:
         if not shop_image.content_type.startswith("image/"):
@@ -120,25 +123,36 @@ def shop_setup(
     current_shop.latitude = latitude
     current_shop.longitude = longitude
     current_shop.address = address
-    if shop_image_url:
-        current_shop.shop_image_url = shop_image_url
-    if owner_image_url:
-        current_shop.owner_image_url = owner_image_url
+    current_shop.shop_image_url = shop_image_url
+    current_shop.owner_image_url = owner_image_url
     current_shop.onboarding_step = OnboardingStep.COMPLETED
     current_shop.is_onboarded = True
+    current_shop.is_online = True
 
     db.commit()
     db.refresh(current_shop)
 
+    # Build the full response shape the frontend expects
+    created_at_str = (
+        current_shop.created_at.isoformat() if current_shop.created_at else None
+    )
+
     return ShopSetupResponse(
         data=ShopSetupData(
-            shop_id=str(current_shop.id),
-            name=current_shop.shop_name,
+            id=str(current_shop.id),
+            shop_name=current_shop.shop_name,
+            owner_name=current_shop.owner_name,
+            phone=current_shop.phone,
             address=current_shop.address,
+            latitude=current_shop.latitude,
+            longitude=current_shop.longitude,
             shop_image_url=current_shop.shop_image_url,
             owner_image_url=current_shop.owner_image_url,
+            is_online=current_shop.is_online,
+            is_verified=current_shop.is_verified,
             is_onboarded=current_shop.is_onboarded,
             onboarding_step=current_shop.onboarding_step.value,
+            created_at=created_at_str,
         )
     )
 
