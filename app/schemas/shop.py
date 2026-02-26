@@ -1,25 +1,33 @@
 from pydantic import BaseModel
 from typing import Optional
+from uuid import UUID
+
 
 class ShopBase(BaseModel):
-    name: str
-    category: str
-    address: str  # Made strictly required to match DB nullable=False
+    shop_name: str
+    owner_name: str
+    address: Optional[str] = None
     latitude: Optional[float] = None
     longitude: Optional[float] = None
-    is_active: Optional[bool] = True
+
 
 class ShopCreate(ShopBase):
-    # We purposely do NOT put owner_id here. 
-    # The frontend shouldn't send it; the backend token will provide it!
-    pass 
+    pass
+
 
 class ShopResponse(ShopBase):
-    id: int
-    owner_id: int # The frontend gets to see who owns it in the response
+    id: UUID
+    phone: str
+    is_verified: bool = False
+    is_onboarded: bool = False
+    is_online: bool = False
+    onboarding_step: str = "registered"
+    shop_image_url: Optional[str] = None
+    owner_image_url: Optional[str] = None
 
     class Config:
         from_attributes = True
+
 
 # Response for the /nearby endpoint — includes how far the shop is
 class ShopNearbyResponse(ShopResponse):
