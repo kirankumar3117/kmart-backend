@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, field_validator
 from typing import Optional
 
 class UserCreate(BaseModel):
@@ -9,6 +9,13 @@ class UserCreate(BaseModel):
     # 'customer', 'shopkeeper', or 'admin'. Defaults to 'customer'.
     role: Optional[str] = "customer" 
 
+    @field_validator('email', mode='before')
+    @classmethod
+    def treat_empty_email_as_none(cls, v):
+        if isinstance(v, str) and v.strip() == "":
+            return None
+        return v
+
 class UserResponse(BaseModel):
     id: int
     full_name: str
@@ -16,6 +23,8 @@ class UserResponse(BaseModel):
     email: Optional[EmailStr] = None  # <--- THIS IS THE CRITICAL FIX
     role: str
     is_active: bool
+    is_verified: bool
+    onboarding_step: str
 
     class Config:
         from_attributes = True

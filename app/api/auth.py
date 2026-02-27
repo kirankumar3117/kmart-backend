@@ -105,8 +105,11 @@ def register_user(user_data: UserCreate, db: Session = Depends(get_db)):
     if existing_phone:
         raise HTTPException(status_code=400, detail="Phone number already registered")
 
-    if user_data.email:
-        existing_email = db.query(User).filter(User.email == user_data.email).first()
+    # Treat empty string or whitespace email as None
+    email_val = user_data.email.strip() if user_data.email and user_data.email.strip() else None
+
+    if email_val:
+        existing_email = db.query(User).filter(User.email == email_val).first()
         if existing_email:
             raise HTTPException(status_code=400, detail="Email already registered")
 
@@ -114,7 +117,7 @@ def register_user(user_data: UserCreate, db: Session = Depends(get_db)):
     new_user = User(
         full_name=user_data.full_name,
         phone_number=user_data.phone_number,
-        email=user_data.email,
+        email=email_val,
         hashed_password=hashed_pwd,
         role=user_data.role,
     )
@@ -135,7 +138,7 @@ def login(login_data: UserLogin, db: Session = Depends(get_db)):
         .first()
     )
 
-    if not user or not verify_password(login_data.password, user.hashed_password):
+    if not user or not user.hashed_password or not verify_password(login_data.password, user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect phone number, password, or role",
