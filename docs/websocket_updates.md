@@ -8,14 +8,14 @@ ws://localhost:8000/ws/orders/{user_id}
 
 ## What It Does
 
-Gives customers **instant push notifications** when a shopkeeper updates their order — no need to keep refreshing!
+Gives customers **instant push notifications** when a merchant updates their order — no need to keep refreshing!
 
 ## How It Works
 
 ```
 1. Customer opens a WebSocket connection to /ws/orders/{user_id}
 2. Connection is stored in a global ConnectionManager (per user_id)
-3. Shopkeeper calls PATCH /api/v1/orders/{order_id} to update status
+3. merchant calls PATCH /api/v1/orders/{order_id} to update status
 4. Backend pushes the update to ALL of that customer's WebSocket connections
 5. Customer's phone/app receives the update instantly
 ```
@@ -30,7 +30,7 @@ ws.onmessage = (event) => {
     const data = JSON.parse(event.data);
     
     if (data.type === "order_update") {
-        // Shopkeeper changed order status!
+        // merchant changed order status!
         console.log(`Order #${data.order_id} is now: ${data.status}`);
         console.log(`Total: ₹${data.total_amount}`);
     }
@@ -50,7 +50,7 @@ ws.onclose = () => {
 
 ### `order_update` — Sent to CUSTOMER
 
-Triggered when: shopkeeper calls `PATCH /api/v1/orders/{order_id}`
+Triggered when: merchant calls `PATCH /api/v1/orders/{order_id}`
 
 ```json
 {
@@ -63,7 +63,7 @@ Triggered when: shopkeeper calls `PATCH /api/v1/orders/{order_id}`
 }
 ```
 
-### `chitty_processed` — Sent to SHOPKEEPER
+### `chitty_processed` — Sent to merchant
 
 Triggered when: OCR finishes processing a handwritten list image.
 

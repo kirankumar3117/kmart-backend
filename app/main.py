@@ -10,7 +10,7 @@ from app.db.session import engine
 from app.db.base import Base
 
 # Import Routers
-from app.api import auth, products, shops, inventory, orders, upload, ws, onboarding
+from app.api import auth, products, shops, inventory, orders, upload, ws, onboarding, agents
 
 # ==========================================
 # THE "UNUSED" IMPORTS (Model Registration)
@@ -102,6 +102,9 @@ app.include_router(upload.router, prefix="/api/v1/upload", tags=["Uploads"])
 
 # Onboarding routes (register, setup, status)
 app.include_router(onboarding.router, prefix="/api/v1/shops", tags=["Onboarding"])
+
+# Agent Operations
+app.include_router(agents.router, prefix="/api/v1/agents", tags=["Agents"])
 
 
 # ==========================================

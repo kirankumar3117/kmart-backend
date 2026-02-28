@@ -154,8 +154,8 @@ def login(login_data: UserLogin, db: Session = Depends(get_db)):
 # ==========================================
 def _build_verify_response(shop: Shop) -> dict:
     """Helper: builds the standard verification response with tokens."""
-    access_token = create_access_token(data={"sub": str(shop.id), "role": "shopkeeper"})
-    refresh_token = create_refresh_token(data={"sub": str(shop.id), "role": "shopkeeper"})
+    access_token = create_access_token(data={"sub": str(shop.id), "role": "merchant"})
+    refresh_token = create_refresh_token(data={"sub": str(shop.id), "role": "merchant"})
 
     return {
         "success": True,
@@ -165,7 +165,7 @@ def _build_verify_response(shop: Shop) -> dict:
                 "phone": shop.phone,
                 "name": shop.owner_name,
                 "email": shop.email,
-                "role": "shopkeeper",
+                "role": "merchant",
                 "isVerified": shop.is_verified,   # camelCase — matches frontend expectation
             },
             "tokens": {

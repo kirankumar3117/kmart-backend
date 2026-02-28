@@ -2,7 +2,7 @@
 
 ## Overview
 
-Customers can place **pre-orders** with a scheduled pickup time, and shopkeepers receive **real-time WebSocket notifications** the moment an order lands. When the shopkeeper marks an order as "ready," the customer gets a `pickup_ready` push.
+Customers can place **pre-orders** with a scheduled pickup time, and merchants receive **real-time WebSocket notifications** the moment an order lands. When the merchant marks an order as "ready," the customer gets a `pickup_ready` push.
 
 ---
 
@@ -24,12 +24,12 @@ pending → confirmed → preparing → ready → picked_up
 
 | Status | Set By | WebSocket Notification |
 |--------|--------|----------------------|
-| `pending` | System (on create) | `new_order` → **shopkeeper** |
-| `confirmed` | Shopkeeper | `order_update` → customer |
-| `preparing` | Shopkeeper | `order_update` → customer |
-| `ready` | Shopkeeper | `pickup_ready` → **customer** |
-| `picked_up` | Shopkeeper | `order_update` → customer |
-| `cancelled` | Shopkeeper | `order_update` → customer |
+| `pending` | System (on create) | `new_order` → **merchant** |
+| `confirmed` | merchant | `order_update` → customer |
+| `preparing` | merchant | `order_update` → customer |
+| `ready` | merchant | `pickup_ready` → **customer** |
+| `picked_up` | merchant | `order_update` → customer |
+| `cancelled` | merchant | `order_update` → customer |
 
 ---
 
@@ -54,11 +54,11 @@ Authorization: Bearer <customer_token>
 }
 ```
 
-### 2. Shopkeeper Confirms + Sets Prep Time
+### 2. merchant Confirms + Sets Prep Time
 
 ```bash
 PATCH /api/v1/orders/{order_id}
-Authorization: Bearer <shopkeeper_token>
+Authorization: Bearer <merchant_token>
 ```
 
 ```json
@@ -68,7 +68,7 @@ Authorization: Bearer <shopkeeper_token>
 }
 ```
 
-### 3. Shopkeeper Marks Ready
+### 3. merchant Marks Ready
 
 ```json
 { "status": "ready" }
@@ -86,7 +86,7 @@ GET /api/v1/orders/shop/{shop_id}?order_type=pre_order&status=pending
 
 ## WebSocket Messages
 
-### `new_order` (→ Shopkeeper)
+### `new_order` (→ merchant)
 
 Triggered when any customer places an order at the shop.
 
@@ -105,7 +105,7 @@ Triggered when any customer places an order at the shop.
 
 ### `pickup_ready` (→ Customer)
 
-Triggered when shopkeeper sets status to `"ready"`.
+Triggered when merchant sets status to `"ready"`.
 
 ```json
 {
@@ -144,6 +144,6 @@ Three new columns added to the `orders` table:
 |--------|------|---------|-------|
 | `order_type` | String | `"instant"` | `"instant"` or `"pre_order"` |
 | `scheduled_pickup_time` | DateTime (TZ) | NULL | Required for pre-orders |
-| `estimated_preparation_minutes` | Integer | NULL | Set by shopkeeper |
+| `estimated_preparation_minutes` | Integer | NULL | Set by merchant |
 
 Migration: `alembic revision --autogenerate -m "add pre_order fields to orders"`

@@ -1,6 +1,6 @@
 # 🛒 Smart Kirana (Kmart) — Backend API
 
-A **FastAPI + PostgreSQL** backend for a local grocery/kirana store marketplace. Connects **customers** with nearby **shopkeepers**, enabling product browsing, order placement (including handwritten shopping list uploads — the "chitty" workflow), and order lifecycle management.
+A **FastAPI + PostgreSQL** backend for a local grocery/kirana store marketplace. Connects **customers** with nearby **merchants**, enabling product browsing, order placement (including handwritten shopping list uploads — the "chitty" workflow), and order lifecycle management.
 
 ```mermaid
 graph TD
@@ -87,7 +87,7 @@ docker-compose up -d
 
 This starts a PostgreSQL 16 container on **port 5433** with:
 - User: `postgres`
-- Password: `admin123`
+- Password: `agent123`
 - Database: `kmart_db`
 
 ### 3. Set up the Python environment
@@ -216,14 +216,14 @@ erDiagram
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| `POST` | `/` | Public | Create a new product (admin use) |
+| `POST` | `/` | Public | Create a new product (agent use) |
 | `GET` | `/` | Public | Search/list products (`?search=` and `?category=` filters) |
 
 ### 🏪 Shops — `/api/v1/shops`
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| `POST` | `/` | 🔒 Shopkeeper | Create a shop (owner_id from JWT) |
+| `POST` | `/` | 🔒 merchant | Create a shop (owner_id from JWT) |
 | `GET` | `/` | Public | List all shops |
 
 ### 📋 Inventory — `/api/v1/inventory`
@@ -239,8 +239,8 @@ erDiagram
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
 | `POST` | `/` | 🔒 Customer | Place an order (instant or pre-order, digital items + optional image list) |
-| `GET` | `/shop/{shop_id}` | 🔒 Shopkeeper | View all orders for a specific shop, with filters for `order_type` and `status` |
-| `PATCH` | `/{order_id}` | 🔒 Shopkeeper | Update order status, total amount, or estimated prep time |
+| `GET` | `/shop/{shop_id}` | 🔒 merchant | View all orders for a specific shop, with filters for `order_type` and `status` |
+| `PATCH` | `/{order_id}` | 🔒 merchant | Update order status, total amount, or estimated prep time |
 | `GET` | `/me` | 🔒 Logged-in | View customer's own order history |
 
 ### 📸 Upload — `/api/v1/upload`
@@ -256,9 +256,9 @@ erDiagram
 Smart Kirana features a **WebSocket-powered notification system** and supports **scheduled pre-orders**:
 
 1. **Pre-Orders**: Customers can place an order with `order_type="pre_order"` and a `scheduled_pickup_time`.
-2. **Shopkeeper Alerts**: The moment an order is placed, the shopkeeper receives a real-time `new_order` WebSocket ping.
-3. **Pickup Ready**: When the shopkeeper marks the order as `"ready"` and sets an `estimated_preparation_minutes`, the customer receives a `pickup_ready` WebSocket notification to come collect their items.
-4. **OCR Processing**: Shopkeepers also receive `chitty_processed` alerts when the background OCR engine finishes scanning a handwritten list component of an order.
+2. **merchant Alerts**: The moment an order is placed, the merchant receives a real-time `new_order` WebSocket ping.
+3. **Pickup Ready**: When the merchant marks the order as `"ready"` and sets an `estimated_preparation_minutes`, the customer receives a `pickup_ready` WebSocket notification to come collect their items.
+4. **OCR Processing**: merchants also receive `chitty_processed` alerts when the background OCR engine finishes scanning a handwritten list component of an order.
 
 ---
 
@@ -270,7 +270,7 @@ A unique feature allowing customers to **photograph a handwritten shopping list*
 sequenceDiagram
     participant C as Customer
     participant API as Backend API
-    participant S as Shopkeeper
+    participant S as merchant
 
     C->>API: POST /upload (photo of handwritten list)
     API-->>C: { list_image_url: "/static/chitty_abc123.jpg" }
@@ -292,7 +292,7 @@ sequenceDiagram
 1. **Register** → password is bcrypt-hashed → stored in DB
 2. **Login** → password verified → JWT created with `user.id` as `sub` claim (valid for **7 days**)
 3. **Protected routes** use `get_current_user` dependency → decodes JWT → fetches user from DB
-4. **Role-based access**: `customer`, `shopkeeper`, `admin`
+4. **Role-based access**: `customer`, `merchant`, `agent`
 
 ---
 
@@ -301,8 +301,8 @@ sequenceDiagram
 | Role | Capabilities |
 |------|-------------|
 | **Customer** | Browse products/shops, place orders, view own orders, upload images |
-| **Shopkeeper** | Create shops, manage inventory, view/update shop orders |
-| **Admin** | Manage product catalog (to be expanded) |
+| **merchant** | Create shops, manage inventory, view/update shop orders |
+| **agent** | Manage product catalog (to be expanded) |
 
 ---
 

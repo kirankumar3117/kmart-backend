@@ -1,12 +1,12 @@
-from sqlalchemy import Column, Integer, String, Boolean, Enum as SQLEnum
+from sqlalchemy import Column, Integer, String, Boolean, Enum as SQLEnum, UniqueConstraint
 from app.db.base import Base
 from app.models.shop import OnboardingStep
 import enum
 
 class UserRole(str, enum.Enum):
     CUSTOMER = "CUSTOMER"
-    SHOPKEEPER = "SHOPKEEPER"
-    ADMIN = "ADMIN"
+    MERCHANT = "MERCHANT"
+    AGENT = "AGENT"
 
 class User(Base):
     __tablename__ = "users"
@@ -14,11 +14,11 @@ class User(Base):
     id = Column(Integer, primary_key=True, index=True)
     full_name = Column(String, index=True, nullable=False)
     
-    # Phone number is now the primary required field
-    phone_number = Column(String, unique=True, index=True, nullable=False)
+    # Phone number is required, uniqueness is now handled by composite constraint
+    phone_number = Column(String, index=True, nullable=False)
     
-    # Email is now completely optional
-    email = Column(String, unique=True, index=True, nullable=True) 
+    # Email is optional, uniqueness also handled by composite constraint
+    email = Column(String, index=True, nullable=True) 
     
     hashed_password = Column(String, nullable=True) # made optional for PIN auth
     is_active = Column(Boolean, default=True)
@@ -31,4 +31,9 @@ class User(Base):
         SQLEnum(OnboardingStep, name="user_onboarding_step_enum", create_constraint=True),
         default=OnboardingStep.REGISTERED,
         nullable=False,
+    )
+    
+    __table_args__ = (
+        UniqueConstraint('phone_number', 'role', name='uq_user_phone_role'),
+        UniqueConstraint('email', 'role', name='uq_user_email_role'),
     )

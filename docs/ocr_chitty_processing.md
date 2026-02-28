@@ -6,8 +6,8 @@ When a customer uploads a **handwritten grocery list** (chitty) and creates an o
 
 1. **Extracts text** from the image using Tesseract OCR
 2. **Fuzzy-matches** each line to product names in the database
-3. **Saves suggestions** for the shopkeeper to review
-4. **Notifies the shopkeeper** via WebSocket
+3. **Saves suggestions** for the merchant to review
+4. **Notifies the merchant** via WebSocket
 
 ## Prerequisites
 
@@ -31,9 +31,9 @@ Fuzzy matching runs         → Each line matched against products DB
                                ↓
 Suggestions saved           → cart_suggestions table in PostgreSQL
                                ↓
-WebSocket notification      → Shopkeeper gets { type: "chitty_processed", items_found: 4 }
+WebSocket notification      → merchant gets { type: "chitty_processed", items_found: 4 }
                                ↓
-Shopkeeper views results    → GET /api/v1/orders/{order_id}/suggestions
+merchant views results    → GET /api/v1/orders/{order_id}/suggestions
 ```
 
 ## API Endpoint
@@ -44,7 +44,7 @@ Shopkeeper views results    → GET /api/v1/orders/{order_id}/suggestions
 GET /api/v1/orders/{order_id}/suggestions
 ```
 
-**Auth:** 🔒 Shopkeeper or the customer who placed the order
+**Auth:** 🔒 merchant or the customer who placed the order
 
 ### Example Response
 
@@ -87,7 +87,7 @@ GET /api/v1/orders/{order_id}/suggestions
 - Uses Python's `difflib.SequenceMatcher` to compare OCR text against all product names
 - **Partial match boost**: If the OCR text contains a product name (or vice-versa), confidence is boosted to ≥ 0.75
 - **Threshold**: Only matches with confidence > 0.40 are linked to a product
-- Unmatched lines are still saved (with `product_id: null`) so the shopkeeper can manually identify them
+- Unmatched lines are still saved (with `product_id: null`) so the merchant can manually identify them
 
 ## Database Model — `cart_suggestions`
 

@@ -12,7 +12,7 @@
 
 ## 📌 What Is This Project?
 
-Smart Kirana is a backend API for a **local grocery store marketplace** (Indian kirana stores). It connects **customers** with **shopkeepers**. Customers can browse nearby shops, view products, place orders (including uploading handwritten grocery lists called "chitties"), and get real-time updates when the shopkeeper processes their order.
+Smart Kirana is a backend API for a **local grocery store marketplace** (Indian kirana stores). It connects **customers** with **merchants**. Customers can browse nearby shops, view products, place orders (including uploading handwritten grocery lists called "chitties"), and get real-time updates when the merchant processes their order.
 
 ---
 
@@ -32,7 +32,7 @@ kmart-backend/
 │   │   ├── upload.py              # POST / (image upload)
 │   │   └── ws.py                  # WebSocket /orders/{user_id}
 │   ├── models/                    # SQLAlchemy ORM models
-│   │   ├── user.py                # User (customer/shopkeeper/admin)
+│   │   ├── user.py                # User (customer/merchant/agent)
 │   │   ├── product.py             # Product (master catalog)
 │   │   ├── shop.py                # Shop (with lat/lng geolocation)
 │   │   ├── inventory.py           # InventoryItem (shop ↔ product bridge)
@@ -74,7 +74,7 @@ kmart-backend/
 ├── requirements.txt               # All Python dependencies
 ├── seed_products.py               # Script to seed 6 sample products
 ├── README.md                      # Full project README with diagrams
-└── .env                           # DATABASE_URL=postgresql://postgres:admin123@127.0.0.1:5433/kmart_db
+└── .env                           # DATABASE_URL=postgresql://postgres:agent123@127.0.0.1:5433/kmart_db
 ```
 
 ---
@@ -90,7 +90,7 @@ kmart-backend/
 | email | String | Optional, nullable |
 | hashed_password | String | bcrypt hash |
 | is_active | Boolean | Default true |
-| role | String | `"customer"`, `"shopkeeper"`, or `"admin"` |
+| role | String | `"customer"`, `"merchant"`, or `"agent"` |
 
 ### 2. `products` (master catalog)
 | Column | Type | Notes |
@@ -109,7 +109,7 @@ kmart-backend/
 | Column | Type | Notes |
 |--------|------|-------|
 | id | Integer PK | |
-| owner_id | Integer FK → users | The shopkeeper who owns it |
+| owner_id | Integer FK → users | The merchant who owns it |
 | name | String | |
 | category | String | |
 | address | Text | |
@@ -133,11 +133,11 @@ kmart-backend/
 | id | Integer PK | |
 | customer_id | Integer FK → users | From JWT token |
 | shop_id | Integer FK → shops | |
-| total_amount | Float | Calculated or set by shopkeeper |
+| total_amount | Float | Calculated or set by merchant |
 | status | String | `"pending"` → `"confirmed"` → `"preparing"` → `"ready"` → `"picked_up"` / `"delivered"` / `"cancelled"` |
 | order_type | String | `"instant"` (default) or `"pre_order"` |
 | scheduled_pickup_time | DateTime | When customer wants to pick up (required for pre-orders) |
-| estimated_preparation_minutes | Integer | Shopkeeper sets this on confirmation |
+| estimated_preparation_minutes | Integer | merchant sets this on confirmation |
 | list_image_url | String | Optional chitty photo URL |
 | order_notes | Text | Optional delivery instructions |
 | created_at | DateTime | Auto-set with timezone |
@@ -182,7 +182,7 @@ kmart-backend/
 ### Shops — `/api/v1/shops`
 | Method | Path | Auth | Body/Params |
 |--------|------|------|-------------|
-| POST | `/` | 🔒 Shopkeeper | `{name, category, address, latitude?, longitude?}` |
+| POST | `/` | 🔒 merchant | `{name, category, address, latitude?, longitude?}` |
 | GET | `/` | Public | `?skip=&limit=` |
 | GET | `/nearby` | Public | `?user_lat=&user_lng=&radius_km=10` (Haversine formula) |
 | GET | `/{shop_id}/items` | Public | Returns joined Product+Inventory (in-stock only) |
@@ -197,11 +197,11 @@ kmart-backend/
 ### Orders — `/api/v1/orders`
 | Method | Path | Auth | Body/Params |
 |--------|------|------|-------------|
-| POST | `/` | 🔒 Customer | `{shop_id, order_type?, scheduled_pickup_time?, items?[], list_image_url?, order_notes?}` — triggers OCR if image; pushes `new_order` WS to shopkeeper |
-| GET | `/shop/{shop_id}` | 🔒 Shopkeeper | All orders for a shop. Filters: `?order_type=pre_order&status=pending` |
-| PATCH | `/{order_id}` | 🔒 Shopkeeper | `{status?, total_amount?, estimated_preparation_minutes?}` — pushes `order_update` or `pickup_ready` WS to customer |
+| POST | `/` | 🔒 Customer | `{shop_id, order_type?, scheduled_pickup_time?, items?[], list_image_url?, order_notes?}` — triggers OCR if image; pushes `new_order` WS to merchant |
+| GET | `/shop/{shop_id}` | 🔒 merchant | All orders for a shop. Filters: `?order_type=pre_order&status=pending` |
+| PATCH | `/{order_id}` | 🔒 merchant | `{status?, total_amount?, estimated_preparation_minutes?}` — pushes `order_update` or `pickup_ready` WS to customer |
 | GET | `/me` | 🔒 Any user | Customer's own orders |
-| GET | `/{order_id}/suggestions` | 🔒 Shopkeeper/Customer | OCR cart suggestions |
+| GET | `/{order_id}/suggestions` | 🔒 merchant/Customer | OCR cart suggestions |
 
 ### Upload — `/api/v1/upload`
 | Method | Path | Auth | Body/Params |
@@ -222,7 +222,7 @@ kmart-backend/
 - **Secret key:** Defined in `config.py` (should be overridden in `.env`)
 - **Algorithm:** HS256
 - **Protected routes** use `Depends(get_current_user)` which decodes JWT and fetches user from DB
-- **Role checks** are done inline (e.g., `if current_user.role != "shopkeeper"`)
+- **Role checks** are done inline (e.g., `if current_user.role != "merchant"`)
 
 ---
 
@@ -235,10 +235,10 @@ kmart-backend/
 - Cleans up dead connections automatically
 
 **Four message types pushed:**
-1. `new_order` → sent to **shopkeeper** when a customer places any order (from `orders.py`)
-2. `order_update` → sent to **customer** when shopkeeper updates order status (from `orders.py`)
-3. `pickup_ready` → sent to **customer** when shopkeeper sets status to `"ready"` (from `orders.py`)
-4. `chitty_processed` → sent to **shopkeeper** when OCR finishes (from `ocr.py`)
+1. `new_order` → sent to **merchant** when a customer places any order (from `orders.py`)
+2. `order_update` → sent to **customer** when merchant updates order status (from `orders.py`)
+3. `pickup_ready` → sent to **customer** when merchant sets status to `"ready"` (from `orders.py`)
+4. `chitty_processed` → sent to **merchant** when OCR finishes (from `ocr.py`)
 
 ---
 
@@ -251,7 +251,7 @@ kmart-backend/
 3. Partial match boost: if OCR text contains product name → confidence ≥ 0.75
 4. Only matches with confidence > 0.40 are linked
 5. Results saved as `CartSuggestion` records
-6. Shopkeeper notified via WebSocket
+6. merchant notified via WebSocket
 
 **Dependencies:** `brew install tesseract` + `pip install pytesseract Pillow`
 
@@ -304,7 +304,7 @@ services:
     container_name: kmart_db_container
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: admin123
+      POSTGRES_PASSWORD: agent123
       POSTGRES_DB: kmart_db
     ports:
       - "5433:5432"  # Maps to HOST port 5433
@@ -312,7 +312,7 @@ services:
 
 ```
 # .env
-DATABASE_URL=postgresql://postgres:admin123@127.0.0.1:5433/kmart_db
+DATABASE_URL=postgresql://postgres:agent123@127.0.0.1:5433/kmart_db
 ```
 
 ---

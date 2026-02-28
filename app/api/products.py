@@ -10,7 +10,7 @@ from app.schemas.product import ProductCreate, ProductResponse
 router = APIRouter()
 
 # ==========================================
-# CREATE MASTER PRODUCT (Protected: Admin Only)
+# CREATE MASTER PRODUCT (Protected: Agent Only)
 # ==========================================
 @router.post("/", response_model=ProductResponse)
 def create_product(
@@ -18,11 +18,11 @@ def create_product(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user) # <--- Require Token
 ):
-    # 1. Strict Role Check: Only admins can touch the master catalog
-    if current_user.role != "admin":
+    # 1. Strict Role Check: Only agents can touch the master catalog
+    if current_user.role != "agent":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only administrators can add master products."
+            detail="Only agents can add master products."
         )
         
     # 2. Check for duplicate barcode if provided

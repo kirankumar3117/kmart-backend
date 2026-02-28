@@ -120,7 +120,7 @@ async def create_order(
     if order_data.list_image_url:
         background_tasks.add_task(process_chitty_order, new_order.id)
 
-    # 8. 🔔 Push real-time notification to the SHOPKEEPER!
+    # 8. 🔔 Push real-time notification to the MERCHANT!
     await manager.send_to_user(shop.owner_id, {
         "type": "new_order",
         "order_id": new_order.id,
@@ -145,11 +145,11 @@ def get_shop_orders(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)  # <--- Require Token
 ):
-    # 1. Role-Based Check: Are they a shopkeeper?
-    if current_user.role != "shopkeeper":
+    # 1. Role-Based Check: Are they a merchant?
+    if current_user.role != "merchant":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN, 
-            detail="Not authorized. Shopkeeper access required."
+            detail="Not authorized. Merchant access required."
         )
 
     # 2. Verify the shop exists
@@ -184,10 +184,10 @@ async def update_order(
     current_user: User = Depends(get_current_user)  # <--- Require Token
 ):
     # 1. Role-Based Check
-    if current_user.role != "shopkeeper":
+    if current_user.role != "merchant":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN, 
-            detail="Not authorized. Shopkeeper access required."
+            detail="Not authorized. Merchant access required."
         )
 
     # 2. Find the order
@@ -255,7 +255,7 @@ def get_my_orders(
 
 
 # ==========================================
-# GET OCR SUGGESTIONS FOR AN ORDER (Shopkeeper)
+# GET OCR SUGGESTIONS FOR AN ORDER (Merchant)
 # ==========================================
 @router.get("/{order_id}/suggestions", response_model=List[CartSuggestionResponse])
 def get_order_suggestions(
@@ -268,8 +268,8 @@ def get_order_suggestions(
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
 
-    # 2. Role check: only the shopkeeper (or the customer themselves) can view suggestions
-    if current_user.role == "shopkeeper" or current_user.id == order.customer_id:
+    # 2. Role check: only the merchant (or the customer themselves) can view suggestions
+    if current_user.role == "merchant" or current_user.id == order.customer_id:
         suggestions = (
             db.query(CartSuggestion)
             .filter(CartSuggestion.order_id == order_id)

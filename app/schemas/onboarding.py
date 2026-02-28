@@ -117,7 +117,7 @@ class VerifyUserData(BaseModel):
     phone: str
     name: str
     email: Optional[str] = None
-    role: str = "shopkeeper"
+    role: str = "merchant"
     isVerified: bool  # camelCase to match frontend expectation
 
 
