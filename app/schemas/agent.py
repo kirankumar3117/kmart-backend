@@ -11,5 +11,6 @@ class AgentOnboardMerchantRequest(BaseModel):
     merchant_image_url: Optional[str] = None
     email: Optional[str] = None
     role: Optional[str] = "merchant"
-    agent_code: str = Field(..., min_length=4, max_length=4, description="The 4-digit Agent just typed")
+    agent_code: Optional[str] = Field(None, min_length=4, max_length=4, description="The 4-digit Agent just typed")
+    shop_category_id: str = Field(..., description="The UUID of the shop category")
 

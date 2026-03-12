@@ -7,6 +7,7 @@ from app.utils.auth import get_current_user
 from app.models.user import User, UserRole
 from app.models.shop import Shop, OnboardingStep
 from app.models.agent import Agent
+from app.models.shop_category import ShopCategory
 from app.schemas.agent import AgentOnboardMerchantRequest
 from app.core.security import get_password_hash, verify_password, create_access_token
 
@@ -68,11 +69,24 @@ async def onboard_shop_by_agent(
 
     # 1.5. Validate Agent Code matches current agent (Optional safety step, since token already proves identity)
     # We'll just verify the agent exists and active
-    agent_record = db.query(Agent).filter(Agent.agent_code == request.agent_code).first()
+    agent_record = None
+    if request.agent_code:
+        agent_record = db.query(Agent).filter(Agent.agent_code == request.agent_code).first()
+    else:
+        agent_record = db.query(Agent).filter(Agent.phone == current_user.phone_number).first()
+
     if not agent_record or not agent_record.is_active:
          raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid or inactive agent code"
+        )
+
+    # 1.6 Validate Shop Category
+    category_record = db.query(ShopCategory).filter(ShopCategory.id == request.shop_category_id).first()
+    if not category_record:
+         raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid shop category ID"
         )
 
     # 2. Check if the user already exists *WITH THIS ROLE*
@@ -84,8 +98,16 @@ async def onboard_shop_by_agent(
     
     if existing_user:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"A user with this phone number already exists as a {target_role}"
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Phone number already registered. Please use a different phone number."
+        )
+
+    # 2.5 Check if the shop phone number already exists
+    existing_shop = db.query(Shop).filter(Shop.phone == request.phone_number).first()
+    if existing_shop:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="A shop with this phone number already exists. Please use a different phone number."
         )
 
     if request.email:
@@ -121,6 +143,7 @@ async def onboard_shop_by_agent(
     # 5. Create the Shop
     new_shop = Shop(
         owner_id=new_user.id,
+        category_id=category_record.id,
         onboarded_by_agent_id=current_user.id,
         agent_id=agent_record.id,
         shop_name=request.shop_name,
@@ -146,6 +169,6 @@ async def onboard_shop_by_agent(
         "data": {
             "shop_id": str(new_shop.id),
             "user_id": new_user.id,
-            "agent_code": agent_record.agent_code
+            "agent_code": agent_record.agent_code if agent_record else None
         }
     }

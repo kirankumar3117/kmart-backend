@@ -27,6 +27,9 @@ class Shop(Base):
     # User linking
     owner_id = Column(Integer, ForeignKey("users.id"), nullable=True)
 
+    # Category linking
+    category_id = Column(UUID(as_uuid=True), ForeignKey("shop_categories.id"), nullable=True)
+
     # Linked to the agent who verified this shop
     agent_id = Column(UUID(as_uuid=True), ForeignKey("agents.id"), nullable=True)
     onboarded_by_agent_id = Column(Integer, ForeignKey("users.id"), nullable=True)

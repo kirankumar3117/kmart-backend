@@ -138,7 +138,18 @@ def login(login_data: UserLogin, db: Session = Depends(get_db)):
         .first()
     )
 
-    if not user or not user.hashed_password or not verify_password(login_data.password, user.hashed_password):
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect phone number, password, or role",
+        )
+
+    # Check against password or PIN depending on what is available
+    if user.hashed_password and verify_password(login_data.password, user.hashed_password):
+        pass # Success
+    elif user.hashed_pin and verify_password(login_data.password, user.hashed_pin):
+        pass # Success
+    else:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect phone number, password, or role",
