@@ -8,6 +8,7 @@ class UserCreate(BaseModel):
     phone_number: str
     # 'customer', 'shopkeeper', or 'admin'. Defaults to 'customer'.
     role: Optional[str] = "customer" 
+    stay_logged_in: bool = False
 
     @field_validator('email', mode='before')
     @classmethod
@@ -33,4 +34,8 @@ class UserResponse(BaseModel):
 class UserLogin(BaseModel):
     phone_number: str
     password: str
-    role: str
+    role: Optional[str] = "customer"
+    stay_logged_in: bool = False
+
+class UserStatusUpdate(BaseModel):
+    is_active: bool

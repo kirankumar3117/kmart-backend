@@ -10,13 +10,13 @@ from app.db.session import engine
 from app.db.base import Base
 
 # Import Routers
-from app.api import auth, products, shops, inventory, orders, upload, ws, onboarding, agents, categories
+from app.api import products, product_categories, shops, inventory, orders, upload, ws, agents, categories, customer_auth, merchant_auth, users
 
 # ==========================================
 # THE "UNUSED" IMPORTS (Model Registration)
 # ==========================================
 # We import these files so SQLAlchemy reads them and registers them to Base.metadata
-from app.models import user, product, shop, inventory as model_inventory, order, cart_suggestion, agent
+from app.models import user, product, product_category, shop, inventory as model_inventory, order, cart_suggestion, agent
 
 # ==========================================
 # TABLE MIGRATIONS (Powered by Alembic)
@@ -93,15 +93,15 @@ app.mount("/static", StaticFiles(directory="uploads"), name="static")
 # ==========================================
 # REGISTER ROUTES
 # ==========================================
-app.include_router(auth.router, prefix="/api/v1/auth", tags=["Authentication"])
+app.include_router(customer_auth.router, prefix="/api/v1/auth/customer", tags=["Customer Authentication"])
+app.include_router(merchant_auth.router, prefix="/api/v1/auth/merchant", tags=["Merchant Authentication"])
+app.include_router(users.router, prefix="/api/v1/users", tags=["Users"])
 app.include_router(products.router, prefix="/api/v1/products", tags=["Products"])
+app.include_router(product_categories.router, prefix="/api/v1/product-categories", tags=["Product Categories"])
 app.include_router(shops.router, prefix="/api/v1/shops", tags=["Shops"])
 app.include_router(inventory.router, prefix="/api/v1/inventory", tags=["Inventory"])
 app.include_router(orders.router, prefix="/api/v1/orders", tags=["Orders"])
 app.include_router(upload.router, prefix="/api/v1/upload", tags=["Uploads"])
-
-# Onboarding routes (register, setup, status)
-app.include_router(onboarding.router, prefix="/api/v1/shops", tags=["Onboarding"])
 
 # Shop Categories
 app.include_router(categories.router, prefix="/api/v1", tags=["Categories"])

@@ -14,3 +14,6 @@ class AgentOnboardMerchantRequest(BaseModel):
     agent_code: Optional[str] = Field(None, min_length=4, max_length=4, description="The 4-digit Agent just typed")
     shop_category_id: str = Field(..., description="The UUID of the shop category")
 
+class AgentStatusUpdate(BaseModel):
+    is_active: bool
+

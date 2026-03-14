@@ -35,4 +35,11 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(securit
     if user is None:
         raise credentials_exception
         
+    # 3. Block inactive users
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, 
+            detail="Your account has been deactivated."
+        )
+        
     return user

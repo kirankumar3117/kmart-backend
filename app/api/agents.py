@@ -8,7 +8,7 @@ from app.models.user import User, UserRole
 from app.models.shop import Shop, OnboardingStep
 from app.models.agent import Agent
 from app.models.shop_category import ShopCategory
-from app.schemas.agent import AgentOnboardMerchantRequest
+from app.schemas.agent import AgentOnboardMerchantRequest, AgentStatusUpdate
 from app.core.security import get_password_hash, verify_password, create_access_token
 
 router = APIRouter()
@@ -170,5 +170,37 @@ async def onboard_shop_by_agent(
             "shop_id": str(new_shop.id),
             "user_id": new_user.id,
             "agent_code": agent_record.agent_code if agent_record else None
+        }
+    }
+
+
+@router.patch("/{agent_id}/status")
+def update_agent_status(agent_id: str, body: AgentStatusUpdate, db: Session = Depends(get_db)):
+    # 1. Update the Agent record
+    agent = db.query(Agent).filter(Agent.id == agent_id).first()
+    if not agent:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Agent not found"
+        )
+    
+    agent.is_active = body.is_active
+    db.commit()
+    db.refresh(agent)
+
+    # 2. Also find and update the associated User record so they can't log in
+    if agent.phone:
+        user = db.query(User).filter(User.phone_number == agent.phone, User.role == "agent").first()
+        if user:
+            user.is_active = body.is_active
+            db.commit()
+            db.refresh(user)
+
+    return {
+        "success": True,
+        "message": f"Agent status updated to {'active' if body.is_active else 'inactive'}",
+        "data": {
+            "agent_id": str(agent.id),
+            "is_active": agent.is_active
         }
     }
