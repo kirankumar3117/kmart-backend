@@ -1,7 +1,9 @@
-from sqlalchemy import Column, Integer, String, Boolean, Enum as SQLEnum, UniqueConstraint
+import uuid
+import enum
+from sqlalchemy import Column, String, Boolean, Enum as SQLEnum, UniqueConstraint
+from sqlalchemy.dialects.postgresql import UUID
 from app.db.base import Base
 from app.models.shop import OnboardingStep
-import enum
 
 class UserRole(str, enum.Enum):
     CUSTOMER = "CUSTOMER"
@@ -12,7 +14,7 @@ class UserRole(str, enum.Enum):
 class User(Base):
     __tablename__ = "users"
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
     full_name = Column(String, index=True, nullable=False)
     
     # Phone number is required, uniqueness is now handled by composite constraint

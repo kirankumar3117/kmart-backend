@@ -1,6 +1,7 @@
 from pydantic import BaseModel, field_validator
 from typing import Optional, List
 from datetime import datetime
+from uuid import UUID
 
 
 # ==========================================
@@ -20,7 +21,7 @@ class ProductCategoryUpdate(BaseModel):
 
 
 class ProductCategoryResponse(BaseModel):
-    id: int
+    id: UUID
     name: str
     description: Optional[str] = None
     image_url: Optional[str] = None

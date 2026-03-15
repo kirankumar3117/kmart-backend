@@ -9,14 +9,14 @@ router = APIRouter()
 # Customers connect here to receive real-time order updates.
 #
 # Frontend usage (React Native / JavaScript):
-#   const ws = new WebSocket("ws://localhost:8000/ws/orders/42");
+#   const ws = new WebSocket("ws://localhost:8000/ws/orders/<user-uuid>");
 #   ws.onmessage = (event) => {
 #       const data = JSON.parse(event.data);
 #       console.log("Order update:", data);
 #   };
 # ==========================================
 @router.websocket("/orders/{user_id}")
-async def websocket_order_updates(websocket: WebSocket, user_id: int):
+async def websocket_order_updates(websocket: WebSocket, user_id: str):
     # 1. Register this connection under the user's ID
     await manager.connect(websocket, user_id)
     

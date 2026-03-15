@@ -4,22 +4,22 @@ import json
 
 class ConnectionManager:
     """
-    Manages WebSocket connections per user_id.
+    Manages WebSocket connections per user_id (UUID string).
     A single customer can have multiple connections (e.g. multiple tabs/devices).
     """
 
     def __init__(self):
         # { user_id: [websocket1, websocket2, ...] }
-        self.active_connections: Dict[int, List[WebSocket]] = {}
+        self.active_connections: Dict[str, List[WebSocket]] = {}
 
-    async def connect(self, websocket: WebSocket, user_id: int):
+    async def connect(self, websocket: WebSocket, user_id: str):
         """Accept the connection and register it under the user's ID."""
         await websocket.accept()
         if user_id not in self.active_connections:
             self.active_connections[user_id] = []
         self.active_connections[user_id].append(websocket)
 
-    def disconnect(self, websocket: WebSocket, user_id: int):
+    def disconnect(self, websocket: WebSocket, user_id: str):
         """Remove the connection when the client disconnects."""
         if user_id in self.active_connections:
             self.active_connections[user_id].remove(websocket)
@@ -27,7 +27,7 @@ class ConnectionManager:
             if not self.active_connections[user_id]:
                 del self.active_connections[user_id]
 
-    async def send_to_user(self, user_id: int, message: dict):
+    async def send_to_user(self, user_id: str, message: dict):
         """Send a JSON message to ALL connections for a specific user."""
         if user_id in self.active_connections:
             dead_connections = []

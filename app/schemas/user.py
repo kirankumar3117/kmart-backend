@@ -1,5 +1,6 @@
 from pydantic import BaseModel, EmailStr, field_validator
 from typing import Optional
+from uuid import UUID
 
 class UserCreate(BaseModel):
     email: Optional[EmailStr] = None # Now optional!
@@ -18,10 +19,10 @@ class UserCreate(BaseModel):
         return v
 
 class UserResponse(BaseModel):
-    id: int
+    id: UUID
     full_name: str
     phone_number: str
-    email: Optional[EmailStr] = None  # <--- THIS IS THE CRITICAL FIX
+    email: Optional[EmailStr] = None
     role: str
     is_active: bool
     is_verified: bool

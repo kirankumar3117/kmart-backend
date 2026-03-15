@@ -8,7 +8,7 @@ from app.models.user import User, UserRole
 from app.models.shop import Shop, OnboardingStep
 from app.models.agent import Agent
 from app.models.shop_category import ShopCategory
-from app.schemas.agent import AgentOnboardMerchantRequest, AgentStatusUpdate
+from app.schemas.agent import AgentOnboardMerchantRequest, AgentStatusUpdate, AgentCreate
 from app.core.security import get_password_hash, verify_password, create_access_token
 
 router = APIRouter()
@@ -16,6 +16,79 @@ router = APIRouter()
 class AgentLoginRequest(BaseModel):
     login_id: str = Field(..., description="Phone number or Agent Code")
     pin: str = Field(..., min_length=4, max_length=4)
+
+
+@router.post("/", status_code=status.HTTP_201_CREATED)
+def create_agent(
+    body: AgentCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    # Only Admin can create agents
+    if current_user.role != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only Admins can create new Agents."
+        )
+
+    # 1. Check if Agent Code exists
+    existing_agent_code = db.query(Agent).filter(Agent.agent_code == body.agent_code).first()
+    if existing_agent_code:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Agent code '{body.agent_code}' is already in use."
+        )
+
+    # 2. Check if the User structure (phone/email per role) already exists
+    existing_user_phone = db.query(User).filter(User.phone_number == body.phone, User.role == "agent").first()
+    if existing_user_phone:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"An agent with phone number '{body.phone}' already exists."
+        )
+
+    if body.email:
+        existing_user_email = db.query(User).filter(User.email == body.email, User.role == "agent").first()
+        if existing_user_email:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"An agent with email '{body.email}' already exists."
+            )
+
+    # 3. Create Agent record
+    new_agent = Agent(
+        name=body.name,
+        agent_code=body.agent_code,
+        phone=body.phone,
+        is_active=True
+    )
+    db.add(new_agent)
+
+    # 4. Create User record for the agent to login
+    hashed_pin = get_password_hash(body.pin)
+    new_user = User(
+        full_name=body.name,
+        phone_number=body.phone,
+        email=body.email,
+        hashed_pin=hashed_pin,
+        role="agent",
+        is_verified=True,
+        onboarding_step=OnboardingStep.COMPLETED,
+    )
+    db.add(new_user)
+    
+    db.commit()
+    db.refresh(new_agent)
+
+    return {
+        "success": True,
+        "message": "Agent created successfully",
+        "data": {
+            "agent_id": str(new_agent.id),
+            "agent_code": new_agent.agent_code,
+            "name": new_agent.name
+        }
+    }
 
 
 @router.post("/login")

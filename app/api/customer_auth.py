@@ -30,7 +30,7 @@ def get_current_user(
     if not token_data or not token_data.get("sub"):
         raise HTTPException(status_code=401, detail="Invalid token")
     
-    user = db.query(User).filter(User.id == int(token_data["sub"])).first()
+    user = db.query(User).filter(User.id == token_data["sub"]).first()
     if not user:
         raise HTTPException(status_code=401, detail="User not found")
         
@@ -45,7 +45,11 @@ def get_current_user(
 # ==========================================
 @router.post("/check-status")
 def check_phone_status(body: CheckPhoneRequest, db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.phone_number == body.phone).first()
+    # check-status defaults to checking customer accounts
+    user = db.query(User).filter(
+        User.phone_number == body.phone,
+        User.role == "customer"
+    ).first()
 
     if not user:
         return CheckPhoneResponse(
@@ -98,7 +102,11 @@ def _build_auth_response(user: User, stay_logged_in: bool = False) -> dict:
 # ==========================================
 @router.post("/register")
 def register_user(body: UserCreate, db: Session = Depends(get_db)):
-    existing = db.query(User).filter(User.phone_number == body.phone_number).first()
+    role_to_check = body.role or "customer"
+    existing = db.query(User).filter(
+        User.phone_number == body.phone_number,
+        User.role == role_to_check
+    ).first()
     
     if existing:
         raise HTTPException(

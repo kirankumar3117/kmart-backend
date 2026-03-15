@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 from typing import List, Optional
+from uuid import UUID as PyUUID
 
 from app.db.session import get_db
 from app.models.product import Product
@@ -36,7 +37,7 @@ def _check_product_access(product: Product, current_user: User):
 # ==========================================
 # HELPER: Resolve category IDs to ProductCategory objects
 # ==========================================
-def _resolve_categories(category_ids: List[int], db: Session) -> List[ProductCategory]:
+def _resolve_categories(category_ids: List[PyUUID], db: Session) -> List[ProductCategory]:
     categories = (
         db.query(ProductCategory)
         .filter(
@@ -48,7 +49,7 @@ def _resolve_categories(category_ids: List[int], db: Session) -> List[ProductCat
     )
     if len(categories) != len(category_ids):
         found_ids = {c.id for c in categories}
-        missing = [cid for cid in category_ids if cid not in found_ids]
+        missing = [str(cid) for cid in category_ids if cid not in found_ids]
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Invalid or inactive category IDs: {missing}",
@@ -104,8 +105,8 @@ def create_product(
 @router.get("/", response_model=List[ProductResponse])
 def list_products(
     search: Optional[str] = Query(None, description="Search by product name"),
-    category_id: Optional[int] = Query(None, description="Filter by category ID"),
-    merchant_id: Optional[int] = Query(None, description="Filter by merchant ID"),
+    category_id: Optional[str] = Query(None, description="Filter by category ID"),
+    merchant_id: Optional[str] = Query(None, description="Filter by merchant ID"),
     skip: int = 0,
     limit: int = 100,
     db: Session = Depends(get_db),
@@ -136,7 +137,7 @@ def list_products(
 # 3. GET SINGLE PRODUCT (Public)
 # ==========================================
 @router.get("/{product_id}", response_model=ProductResponse)
-def get_product(product_id: int, db: Session = Depends(get_db)):
+def get_product(product_id: PyUUID, db: Session = Depends(get_db)):
     product = db.query(Product).filter(Product.id == product_id).first()
     if not product or product.is_deleted:
         raise HTTPException(
@@ -151,7 +152,7 @@ def get_product(product_id: int, db: Session = Depends(get_db)):
 # ==========================================
 @router.patch("/{product_id}", response_model=ProductResponse)
 def update_product(
-    product_id: int,
+    product_id: PyUUID,
     body: ProductUpdate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -200,7 +201,7 @@ def update_product(
 # ==========================================
 @router.patch("/{product_id}/deactivate", response_model=ProductResponse)
 def deactivate_product(
-    product_id: int,
+    product_id: PyUUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -224,7 +225,7 @@ def deactivate_product(
 # ==========================================
 @router.delete("/{product_id}")
 def delete_product(
-    product_id: int,
+    product_id: PyUUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):

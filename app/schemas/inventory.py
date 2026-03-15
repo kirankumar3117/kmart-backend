@@ -1,5 +1,6 @@
 from pydantic import BaseModel
 from typing import Optional
+from uuid import UUID
 
 # 1. The core fields we always need
 class InventoryBase(BaseModel):
@@ -8,14 +9,14 @@ class InventoryBase(BaseModel):
 
 # 2. What the frontend sends when adding an item to the store
 class InventoryCreate(InventoryBase):
-    shop_id: int
-    product_id: int
+    shop_id: UUID
+    product_id: UUID
 
 # 3. What we send back to the frontend
 class InventoryResponse(InventoryBase):
-    id: int
-    shop_id: int
-    product_id: int
+    id: UUID
+    shop_id: UUID
+    product_id: UUID
 
     class Config:
         from_attributes = True
@@ -28,8 +29,8 @@ class InventoryUpdate(BaseModel):
 # 5. Joined response: Product details + shop-specific price/stock
 #    Used by GET /shops/{shop_id}/items
 class ShopItemResponse(BaseModel):
-    inventory_id: int       # InventoryItem.id
-    product_id: int
+    inventory_id: UUID       # InventoryItem.id
+    product_id: UUID
     product_name: str
     category: Optional[str] = None
     image_url: Optional[str] = None

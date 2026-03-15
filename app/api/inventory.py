@@ -1,13 +1,15 @@
 from app.utils.auth import get_current_user
 from app.schemas.inventory import InventoryUpdate
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List
+from uuid import UUID
 
 from app.db.session import get_db
 from app.models.inventory import InventoryItem
 from app.models.shop import Shop
 from app.models.product import Product
+from app.models.user import User
 from app.schemas.inventory import InventoryCreate, InventoryResponse
 
 router = APIRouter()
@@ -48,7 +50,7 @@ def add_to_inventory(
     return new_item
 
 @router.get("/shop/{shop_id}", response_model=List[InventoryResponse])
-def get_shop_inventory(shop_id: int, skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+def get_shop_inventory(shop_id: str, skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     # 1. Verify the shop exists
     shop = db.query(Shop).filter(Shop.id == shop_id).first()
     if not shop:
@@ -63,7 +65,7 @@ def get_shop_inventory(shop_id: int, skip: int = 0, limit: int = 100, db: Sessio
 # ==========================================
 @router.patch("/{item_id}", response_model=InventoryResponse)
 def update_inventory_item(
-    item_id: int, 
+    item_id: UUID, 
     update_data: InventoryUpdate, 
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user) # <--- Require Token

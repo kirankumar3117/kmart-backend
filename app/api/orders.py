@@ -2,6 +2,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, s
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from datetime import datetime, timezone
+from uuid import UUID
 
 from app.db.session import get_db
 from app.models.order import Order, OrderItem
@@ -121,9 +122,9 @@ async def create_order(
         background_tasks.add_task(process_chitty_order, new_order.id)
 
     # 8. 🔔 Push real-time notification to the MERCHANT!
-    await manager.send_to_user(shop.owner_id, {
+    await manager.send_to_user(str(shop.owner_id), {
         "type": "new_order",
-        "order_id": new_order.id,
+        "order_id": str(new_order.id),
         "customer_name": current_user.full_name,
         "order_type": new_order.order_type,
         "scheduled_pickup_time": str(new_order.scheduled_pickup_time) if new_order.scheduled_pickup_time else None,
@@ -139,7 +140,7 @@ async def create_order(
 # ==========================================
 @router.get("/shop/{shop_id}", response_model=List[OrderResponse])
 def get_shop_orders(
-    shop_id: int,
+    shop_id: str,
     order_type: Optional[str] = Query(None, description="Filter by order type: instant or pre_order"),
     order_status: Optional[str] = Query(None, alias="status", description="Filter by status: pending, confirmed, etc."),
     db: Session = Depends(get_db),
@@ -178,7 +179,7 @@ def get_shop_orders(
 # ==========================================
 @router.patch("/{order_id}", response_model=OrderResponse)
 async def update_order(
-    order_id: int, 
+    order_id: UUID, 
     update_data: OrderUpdate, 
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)  # <--- Require Token
@@ -217,20 +218,20 @@ async def update_order(
     # 5. 🔔 Push real-time update to the CUSTOMER via WebSocket!
     if update_data.status == "ready":
         # Special pickup-ready notification
-        await manager.send_to_user(order.customer_id, {
+        await manager.send_to_user(str(order.customer_id), {
             "type": "pickup_ready",
-            "order_id": order.id,
-            "shop_id": order.shop_id,
+            "order_id": str(order.id),
+            "shop_id": str(order.shop_id),
             "status": order.status,
             "estimated_preparation_minutes": order.estimated_preparation_minutes,
             "message": "Your order is ready for pickup!",
         })
     else:
         # Standard order update (confirmed, preparing, etc.)
-        await manager.send_to_user(order.customer_id, {
+        await manager.send_to_user(str(order.customer_id), {
             "type": "order_update",
-            "order_id": order.id,
-            "shop_id": order.shop_id,
+            "order_id": str(order.id),
+            "shop_id": str(order.shop_id),
             "status": order.status,
             "total_amount": order.total_amount,
             "estimated_preparation_minutes": order.estimated_preparation_minutes,
@@ -259,7 +260,7 @@ def get_my_orders(
 # ==========================================
 @router.get("/{order_id}/suggestions", response_model=List[CartSuggestionResponse])
 def get_order_suggestions(
-    order_id: int,
+    order_id: UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):

@@ -30,8 +30,8 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(securit
     except jwt.PyJWTError:
         raise credentials_exception
 
-    # 2. Find the user in the database
-    user = db.query(User).filter(User.id == int(user_id)).first()
+    # 2. Find the user in the database (user_id is now a UUID string)
+    user = db.query(User).filter(User.id == user_id).first()
     if user is None:
         raise credentials_exception
         

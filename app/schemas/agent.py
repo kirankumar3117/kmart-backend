@@ -1,6 +1,13 @@
 from pydantic import BaseModel, Field
 from typing import Optional
 
+class AgentCreate(BaseModel):
+    name: str = Field(..., description="Full Name of the Agent")
+    agent_code: str = Field(..., description="Unique code for the Agent (e.g., AG01)")
+    phone: str = Field(..., description="Phone number of the Agent")
+    pin: str = Field(..., min_length=4, max_length=4, description="4-digit PIN for login")
+    email: Optional[str] = None
+
 class AgentOnboardMerchantRequest(BaseModel):
     merchant_name: str
     phone_number: str

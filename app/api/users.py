@@ -1,5 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
+from uuid import UUID
+
 from app.db.session import get_db
 from app.models.user import User
 from app.schemas.user import UserStatusUpdate
@@ -7,7 +9,7 @@ from app.schemas.user import UserStatusUpdate
 router = APIRouter()
 
 @router.patch("/{user_id}/status")
-def update_user_status(user_id: int, body: UserStatusUpdate, db: Session = Depends(get_db)):
+def update_user_status(user_id: UUID, body: UserStatusUpdate, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(
@@ -23,7 +25,7 @@ def update_user_status(user_id: int, body: UserStatusUpdate, db: Session = Depen
         "success": True,
         "message": f"User status updated to {'active' if body.is_active else 'inactive'}",
         "data": {
-            "user_id": user.id,
+            "user_id": str(user.id),
             "is_active": user.is_active
         }
     }

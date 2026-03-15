@@ -10,7 +10,7 @@ from app.db.session import engine
 from app.db.base import Base
 
 # Import Routers
-from app.api import products, product_categories, shops, inventory, orders, upload, ws, agents, categories, customer_auth, merchant_auth, users
+from app.api import products, product_categories, shops, inventory, orders, upload, ws, agents, categories, customer_auth, merchant_auth, admin_auth, users
 
 # ==========================================
 # THE "UNUSED" IMPORTS (Model Registration)
@@ -95,6 +95,7 @@ app.mount("/static", StaticFiles(directory="uploads"), name="static")
 # ==========================================
 app.include_router(customer_auth.router, prefix="/api/v1/auth/customer", tags=["Customer Authentication"])
 app.include_router(merchant_auth.router, prefix="/api/v1/auth/merchant", tags=["Merchant Authentication"])
+app.include_router(admin_auth.router, prefix="/api/v1/auth/admin", tags=["Admin Authentication"])
 app.include_router(users.router, prefix="/api/v1/users", tags=["Users"])
 app.include_router(products.router, prefix="/api/v1/products", tags=["Products"])
 app.include_router(product_categories.router, prefix="/api/v1/product-categories", tags=["Product Categories"])

@@ -1,6 +1,7 @@
 from pydantic import BaseModel, field_validator
 from typing import Optional, List
 from datetime import datetime
+from uuid import UUID
 from app.schemas.product_category import ProductCategoryResponse
 
 
@@ -16,7 +17,7 @@ class ProductCreate(BaseModel):
     mrp: float
     unit: str
     barcode: Optional[str] = None
-    category_ids: List[int]  # At least one required
+    category_ids: List[UUID]  # At least one required
 
     @field_validator("category_ids")
     @classmethod
@@ -35,7 +36,7 @@ class ProductUpdate(BaseModel):
     unit: Optional[str] = None
     barcode: Optional[str] = None
     is_active: Optional[bool] = None
-    category_ids: Optional[List[int]] = None
+    category_ids: Optional[List[UUID]] = None
 
     @field_validator("category_ids")
     @classmethod
@@ -47,8 +48,8 @@ class ProductUpdate(BaseModel):
 
 # Schema for READING a product (Output)
 class ProductResponse(BaseModel):
-    id: int
-    merchant_id: int
+    id: UUID
+    merchant_id: UUID
     name: str
     description: Optional[str] = None
     image_url: Optional[str] = None

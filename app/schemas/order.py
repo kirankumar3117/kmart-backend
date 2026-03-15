@@ -1,18 +1,19 @@
 from pydantic import BaseModel
 from typing import List, Optional
 from datetime import datetime
+from uuid import UUID
 
 # 1. The individual items in the cart
 class OrderItemCreate(BaseModel):
     # Now Optional: If they upload a handwritten list, they might not send digital products!
-    product_id: Optional[int] = None 
+    product_id: Optional[UUID] = None 
     quantity: int = 1
     # NEW: For requests like "270g only" or "Make the Biryani extra spicy"
     special_instructions: Optional[str] = None
 
 class OrderItemResponse(BaseModel):
-    id: int
-    product_id: Optional[int] = None
+    id: UUID
+    product_id: Optional[UUID] = None
     quantity: int
     price_at_time_of_order: float
     special_instructions: Optional[str] = None
@@ -22,7 +23,7 @@ class OrderItemResponse(BaseModel):
 
 # 2. The main Checkout Payload
 class OrderCreate(BaseModel):
-    shop_id: int
+    shop_id: UUID
     
     # NEW: Link to the handwritten list photo
     list_image_url: Optional[str] = None 
@@ -38,9 +39,9 @@ class OrderCreate(BaseModel):
     items: Optional[List[OrderItemCreate]] = [] 
 
 class OrderResponse(BaseModel):
-    id: int
-    customer_id: int
-    shop_id: int
+    id: UUID
+    customer_id: UUID
+    shop_id: UUID
     total_amount: float
     status: str
     list_image_url: Optional[str] = None
@@ -61,4 +62,3 @@ class OrderUpdate(BaseModel):
     total_amount: Optional[float] = None
     # Shopkeeper sets how long to prepare the order
     estimated_preparation_minutes: Optional[int] = None
-

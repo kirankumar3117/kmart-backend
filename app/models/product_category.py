@@ -1,4 +1,6 @@
-from sqlalchemy import Column, Integer, String, Boolean, Text, DateTime, Table, ForeignKey
+import uuid
+from sqlalchemy import Column, String, Boolean, Text, DateTime, Table, ForeignKey
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.sql import func
 from app.db.base import Base
 
@@ -8,15 +10,15 @@ from app.db.base import Base
 product_category_link = Table(
     "product_category_link",
     Base.metadata,
-    Column("product_id", Integer, ForeignKey("products.id", ondelete="CASCADE"), primary_key=True),
-    Column("category_id", Integer, ForeignKey("product_categories.id", ondelete="CASCADE"), primary_key=True),
+    Column("product_id", UUID(as_uuid=True), ForeignKey("products.id", ondelete="CASCADE"), primary_key=True),
+    Column("category_id", UUID(as_uuid=True), ForeignKey("product_categories.id", ondelete="CASCADE"), primary_key=True),
 )
 
 
 class ProductCategory(Base):
     __tablename__ = "product_categories"
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
     name = Column(String, unique=True, index=True, nullable=False)
     description = Column(Text, nullable=True)
     image_url = Column(String, nullable=True)

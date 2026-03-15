@@ -1,6 +1,6 @@
 import uuid
 import enum
-from sqlalchemy import Column, String, Boolean, Text, Float, ForeignKey, DateTime, Enum, Integer
+from sqlalchemy import Column, String, Boolean, Text, Float, ForeignKey, DateTime, Enum
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.sql import func
 from app.db.base import Base
@@ -24,15 +24,15 @@ class Shop(Base):
     email = Column(String, nullable=True)
     referral_code = Column(String, nullable=True)
 
-    # User linking
-    owner_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    # User linking — now UUID
+    owner_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
 
     # Category linking
     category_id = Column(UUID(as_uuid=True), ForeignKey("shop_categories.id"), nullable=True)
 
     # Linked to the agent who verified this shop
     agent_id = Column(UUID(as_uuid=True), ForeignKey("agents.id"), nullable=True)
-    onboarded_by_agent_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    onboarded_by_agent_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
 
     # Location & images (filled in Step 3)
     latitude = Column(Float, nullable=True)

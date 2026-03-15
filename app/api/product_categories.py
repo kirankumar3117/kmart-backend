@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List
+from uuid import UUID
 
 from app.db.session import get_db
 from app.models.product_category import ProductCategory
@@ -74,7 +75,7 @@ def list_product_categories(db: Session = Depends(get_db)):
 # ==========================================
 @router.patch("/{category_id}", response_model=ProductCategoryResponse)
 def update_product_category(
-    category_id: int,
+    category_id: UUID,
     body: ProductCategoryUpdate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -115,7 +116,7 @@ def update_product_category(
 # ==========================================
 @router.delete("/{category_id}")
 def delete_product_category(
-    category_id: int,
+    category_id: UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):

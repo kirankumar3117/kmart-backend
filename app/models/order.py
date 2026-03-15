@@ -1,3 +1,4 @@
+import uuid
 from sqlalchemy import Column, Integer, Float, String, ForeignKey, DateTime, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.sql import func
@@ -7,8 +8,8 @@ from app.db.base import Base
 class Order(Base):
     __tablename__ = "orders"
 
-    id = Column(Integer, primary_key=True, index=True)
-    customer_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    customer_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     shop_id = Column(UUID(as_uuid=True), ForeignKey("shops.id"), nullable=False)
     
     total_amount = Column(Float, default=0.0)
@@ -31,12 +32,12 @@ class Order(Base):
 class OrderItem(Base):
     __tablename__ = "order_items"
 
-    id = Column(Integer, primary_key=True, index=True)
-    order_id = Column(Integer, ForeignKey("orders.id"), nullable=False)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    order_id = Column(UUID(as_uuid=True), ForeignKey("orders.id"), nullable=False)
     
     # We make this True (optional) because if they upload a photo list, 
     # they might not select specific digital products at checkout!
-    product_id = Column(Integer, ForeignKey("products.id"), nullable=True)
+    product_id = Column(UUID(as_uuid=True), ForeignKey("products.id"), nullable=True)
     
     quantity = Column(Integer, nullable=False, default=1)
     price_at_time_of_order = Column(Float, nullable=False, default=0.0)
