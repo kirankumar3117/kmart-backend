@@ -5,6 +5,7 @@ from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.db.base import Base
 from app.models.product_category import product_category_link
+from app.models.product_subcategory import ProductSubcategory
 
 
 class Product(Base):
@@ -29,6 +30,13 @@ class Product(Base):
     # Metadata
     barcode = Column(String, unique=True, index=True, nullable=True)  # For scanning
 
+    # Optional subcategory
+    subcategory_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("product_subcategories.id"),
+        nullable=True,
+    )
+
     # Status flags
     is_active = Column(Boolean, default=True)
     is_deleted = Column(Boolean, default=False)
@@ -46,3 +54,6 @@ class Product(Base):
         backref="products",
         lazy="joined",
     )
+
+    # Optional relationship to subcategory
+    subcategory = relationship("ProductSubcategory", backref="products", lazy="joined")

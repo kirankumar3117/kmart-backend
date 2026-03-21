@@ -3,6 +3,7 @@ from typing import Optional, List
 from datetime import datetime
 from uuid import UUID
 from app.schemas.product_category import ProductCategoryResponse
+from app.schemas.product_subcategory import ProductSubcategoryResponse
 
 
 # ==========================================
@@ -18,6 +19,7 @@ class ProductCreate(BaseModel):
     unit: str
     barcode: Optional[str] = None
     category_ids: List[UUID]  # At least one required
+    subcategory_id: Optional[UUID] = None  # Optional subcategory
 
     @field_validator("category_ids")
     @classmethod
@@ -37,6 +39,7 @@ class ProductUpdate(BaseModel):
     barcode: Optional[str] = None
     is_active: Optional[bool] = None
     category_ids: Optional[List[UUID]] = None
+    subcategory_id: Optional[UUID] = None
 
     @field_validator("category_ids")
     @classmethod
@@ -61,6 +64,8 @@ class ProductResponse(BaseModel):
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
     categories: List[ProductCategoryResponse] = []
+    subcategory_id: Optional[UUID] = None
+    subcategory: Optional[ProductSubcategoryResponse] = None
 
     class Config:
         from_attributes = True

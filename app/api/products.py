@@ -6,6 +6,7 @@ from uuid import UUID as PyUUID
 from app.db.session import get_db
 from app.models.product import Product
 from app.models.product_category import ProductCategory, product_category_link
+from app.models.product_subcategory import ProductSubcategory
 from app.models.user import User
 from app.schemas.product import ProductCreate, ProductUpdate, ProductResponse
 from app.utils.auth import get_current_user
@@ -58,6 +59,37 @@ def _resolve_categories(category_ids: List[PyUUID], db: Session) -> List[Product
 
 
 # ==========================================
+# HELPER: Validate subcategory
+# ==========================================
+def _validate_subcategory(
+    subcategory_id, category_ids: list, db: Session
+) -> ProductSubcategory:
+    """Validate that the subcategory exists, is active, and belongs to one of the given categories."""
+    subcategory = (
+        db.query(ProductSubcategory)
+        .filter(
+            ProductSubcategory.id == subcategory_id,
+            ProductSubcategory.is_deleted == False,
+            ProductSubcategory.is_active == True,
+        )
+        .first()
+    )
+    if not subcategory:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Subcategory not found or is inactive.",
+        )
+
+    if subcategory.category_id not in category_ids:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Subcategory does not belong to any of the selected categories.",
+        )
+
+    return subcategory
+
+
+# ==========================================
 # 1. CREATE PRODUCT (Merchant / Admin)
 # ==========================================
 @router.post("/", response_model=ProductResponse, status_code=201)
@@ -85,6 +117,10 @@ def create_product(
     # Resolve categories
     categories = _resolve_categories(body.category_ids, db)
 
+    # Validate subcategory if provided
+    if body.subcategory_id:
+        _validate_subcategory(body.subcategory_id, body.category_ids, db)
+
     # Create product
     product_data = body.model_dump(exclude={"category_ids"})
     new_product = Product(**product_data, merchant_id=current_user.id)
@@ -104,8 +140,9 @@ def create_product(
 # ==========================================
 @router.get("/", response_model=List[ProductResponse])
 def list_products(
-    search: Optional[str] = Query(None, description="Search by product name"),
+    search: Optional[str] = Query(None, description="Search by product name or subcategory name"),
     category_id: Optional[str] = Query(None, description="Filter by category ID"),
+    subcategory_id: Optional[str] = Query(None, description="Filter by subcategory ID"),
     merchant_id: Optional[str] = Query(None, description="Filter by merchant ID"),
     skip: int = 0,
     limit: int = 100,
@@ -116,15 +153,41 @@ def list_products(
         Product.is_deleted == False,
     )
 
-    # Filter by product name (case-insensitive)
+    # Search by product name OR subcategory name
     if search:
-        query = query.filter(Product.name.ilike(f"%{search}%"))
+        # Find subcategory IDs that match the search term
+        matching_subcategory_ids = (
+            db.query(ProductSubcategory.id)
+            .filter(
+                ProductSubcategory.name.ilike(f"%{search}%"),
+                ProductSubcategory.is_active == True,
+                ProductSubcategory.is_deleted == False,
+            )
+            .all()
+        )
+        matching_sub_ids = [s.id for s in matching_subcategory_ids]
+
+        from sqlalchemy import or_
+
+        if matching_sub_ids:
+            query = query.filter(
+                or_(
+                    Product.name.ilike(f"%{search}%"),
+                    Product.subcategory_id.in_(matching_sub_ids),
+                )
+            )
+        else:
+            query = query.filter(Product.name.ilike(f"%{search}%"))
 
     # Filter by category (via many-to-many join)
     if category_id:
         query = query.join(product_category_link).filter(
             product_category_link.c.category_id == category_id
         )
+
+    # Filter by subcategory
+    if subcategory_id:
+        query = query.filter(Product.subcategory_id == subcategory_id)
 
     # Filter by merchant
     if merchant_id:
@@ -173,6 +236,19 @@ def update_product(
     if "category_ids" in update_data:
         category_ids = update_data.pop("category_ids")
         product.categories = _resolve_categories(category_ids, db)
+
+    # Handle subcategory update
+    if "subcategory_id" in update_data:
+        new_sub_id = update_data.pop("subcategory_id")
+        if new_sub_id is not None:
+            # Determine which category_ids to validate against
+            current_category_ids = (
+                category_ids
+                if "category_ids" in body.model_dump(exclude_unset=True)
+                else [c.id for c in product.categories]
+            )
+            _validate_subcategory(new_sub_id, current_category_ids, db)
+        product.subcategory_id = new_sub_id
 
     # Check barcode uniqueness if changing
     if "barcode" in update_data and update_data["barcode"]:
