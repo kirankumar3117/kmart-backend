@@ -10,13 +10,13 @@ from app.db.session import engine
 from app.db.base import Base
 
 # Import Routers
-from app.api import products, product_categories, product_subcategories, shops, inventory, orders, upload, ws, agents, categories, customer_auth, merchant_auth, admin_auth, users
+from app.api import products, product_categories, product_subcategories, shops, inventory, orders, upload, ws, agents, categories, customer_auth, merchant_auth, admin_auth, users, notifications, internal
 
 # ==========================================
 # THE "UNUSED" IMPORTS (Model Registration)
 # ==========================================
 # We import these files so SQLAlchemy reads them and registers them to Base.metadata
-from app.models import user, product, product_category, product_subcategory, shop, inventory as model_inventory, order, cart_suggestion, agent
+from app.models import user, product, product_category, product_subcategory, shop, inventory as model_inventory, order, cart_suggestion, agent, notification
 
 # ==========================================
 # TABLE MIGRATIONS (Powered by Alembic)
@@ -103,6 +103,8 @@ app.include_router(product_subcategories.router, prefix="/api/v1/product-subcate
 app.include_router(shops.router, prefix="/api/v1/shops", tags=["Shops"])
 app.include_router(inventory.router, prefix="/api/v1/inventory", tags=["Inventory"])
 app.include_router(orders.router, prefix="/api/v1/orders", tags=["Orders"])
+app.include_router(notifications.router, prefix="/api/v1/notifications", tags=["Notifications"])
+app.include_router(internal.router, prefix="/api/v1/internal", tags=["Internal"])
 app.include_router(upload.router, prefix="/api/v1/upload", tags=["Uploads"])
 
 # Shop Categories

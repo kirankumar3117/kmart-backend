@@ -12,6 +12,9 @@ class Settings(BaseSettings):
     
     # --- ADMIN CREATION ---
     ADMIN_CREATION_SECRET: str
+    
+    # --- CRON SECRETS ---
+    CRON_SECRET: str = "test-cron-secret-change-in-production"
 
     class Config:
         env_file = ".env"

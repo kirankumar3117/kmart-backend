@@ -1,6 +1,6 @@
 import uuid
 from sqlalchemy import Column, Integer, Float, String, ForeignKey, DateTime, Text
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import UUID, JSON
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from app.db.base import Base
@@ -20,8 +20,8 @@ class Order(Base):
     scheduled_pickup_time = Column(DateTime(timezone=True), nullable=True)
     estimated_preparation_minutes = Column(Integer, nullable=True)
     
-    # NEW: Store the URL of the uploaded handwritten list or image
-    list_image_url = Column(String, nullable=True) 
+    # NEW: Store the URLs of the uploaded handwritten lists or images
+    list_image_urls = Column(JSON, nullable=True, default=list) 
     
     # NEW: General instructions for the whole order (e.g., "Deliver after 5 PM")
     order_notes = Column(Text, nullable=True)
@@ -44,3 +44,6 @@ class OrderItem(Base):
     
     # NEW: For requests like "Need exactly 270 grams" or "Make the Biryani spicy"
     special_instructions = Column(String, nullable=True)
+
+    # NEW: Add relationship to easily fetch product details
+    product = relationship("Product", lazy="joined")

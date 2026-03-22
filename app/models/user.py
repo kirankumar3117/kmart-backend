@@ -36,6 +36,9 @@ class User(Base):
         nullable=False,
     )
     
+    # Push Notifications
+    fcm_token = Column(String, nullable=True)
+    
     __table_args__ = (
         UniqueConstraint('phone_number', 'role', name='uq_user_phone_role'),
         UniqueConstraint('email', 'role', name='uq_user_email_role'),

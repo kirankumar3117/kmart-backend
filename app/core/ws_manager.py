@@ -41,6 +41,10 @@ class ConnectionManager:
             for dc in dead_connections:
                 self.active_connections[user_id].remove(dc)
 
+    def is_connected(self, user_id: str) -> bool:
+        """Check if the user has any active WebSocket connections."""
+        return bool(self.active_connections.get(user_id))
+
 
 # Single global instance — imported everywhere
 manager = ConnectionManager()

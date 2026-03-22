@@ -8,6 +8,8 @@ from app.models.product import Product
 from app.models.product_category import ProductCategory, product_category_link
 from app.models.product_subcategory import ProductSubcategory
 from app.models.user import User
+from app.models.shop import Shop
+from app.models.inventory import InventoryItem
 from app.schemas.product import ProductCreate, ProductUpdate, ProductResponse
 from app.utils.auth import get_current_user
 
@@ -144,6 +146,7 @@ def list_products(
     category_id: Optional[str] = Query(None, description="Filter by category ID"),
     subcategory_id: Optional[str] = Query(None, description="Filter by subcategory ID"),
     merchant_id: Optional[str] = Query(None, description="Filter by merchant ID"),
+    available_only: bool = Query(False, description="For customers: only show products with stock > 0 in online shops"),
     skip: int = 0,
     limit: int = 100,
     db: Session = Depends(get_db),
@@ -192,6 +195,16 @@ def list_products(
     # Filter by merchant
     if merchant_id:
         query = query.filter(Product.merchant_id == merchant_id)
+
+    # Filter by availability (for customers)
+    if available_only:
+        query = query.join(InventoryItem, Product.id == InventoryItem.product_id)\
+                     .join(Shop, InventoryItem.shop_id == Shop.id)\
+                     .filter(
+                         InventoryItem.stock > 0,
+                         Shop.is_onboarded == True,
+                         Shop.is_online == True
+                     ).distinct()
 
     return query.offset(skip).limit(limit).all()
 

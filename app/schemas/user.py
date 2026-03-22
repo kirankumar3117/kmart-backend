@@ -40,3 +40,6 @@ class UserLogin(BaseModel):
 
 class UserStatusUpdate(BaseModel):
     is_active: bool
+
+class FCMTokenUpdate(BaseModel):
+    fcm_token: str

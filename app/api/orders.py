@@ -9,12 +9,11 @@ from app.models.order import Order, OrderItem
 from app.models.inventory import InventoryItem
 from app.models.shop import Shop
 from app.models.cart_suggestion import CartSuggestion
-from app.schemas.order import OrderCreate, OrderResponse, OrderUpdate
+from app.schemas.order import OrderCreate, OrderResponse, OrderUpdate, PaginatedOrderResponse
 from app.schemas.cart_suggestion import CartSuggestionResponse
 from app.utils.auth import get_current_user
 from app.models.user import User
-from app.core.ws_manager import manager  # <--- WebSocket Manager
-from app.services.ocr import process_chitty_order  # <--- OCR Background Task
+from app.services.notification_service import send_notification
 
 
 router = APIRouter()
@@ -33,7 +32,14 @@ async def create_order(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)  # <--- THE SECURITY BOUNCER
 ):
-    # 1. Validate order_type
+    # 1. Role Check: Only customers can place orders
+    if current_user.role != "customer":
+        raise HTTPException(
+            status_code=403, 
+            detail="Only customers can place orders."
+        )
+
+    # 2. Validate order_type
     if order_data.order_type not in VALID_ORDER_TYPES:
         raise HTTPException(
             status_code=400, 
@@ -97,7 +103,7 @@ async def create_order(
         status="pending",
         order_type=order_data.order_type,
         scheduled_pickup_time=order_data.scheduled_pickup_time,
-        list_image_url=order_data.list_image_url,
+        list_image_urls=order_data.list_image_urls,
         order_notes=order_data.order_notes
     )
     db.add(new_order)
@@ -118,31 +124,39 @@ async def create_order(
     db.refresh(new_order)
 
     # 7. 📸 If a chitty image was uploaded, trigger OCR in the background!
-    if order_data.list_image_url:
+    if order_data.list_image_urls:
+        from app.services.ocr import process_chitty_order
         background_tasks.add_task(process_chitty_order, new_order.id)
 
-    # 8. 🔔 Push real-time notification to the MERCHANT!
-    await manager.send_to_user(str(shop.owner_id), {
-        "type": "new_order",
-        "order_id": str(new_order.id),
-        "customer_name": current_user.full_name,
-        "order_type": new_order.order_type,
-        "scheduled_pickup_time": str(new_order.scheduled_pickup_time) if new_order.scheduled_pickup_time else None,
-        "total_amount": new_order.total_amount,
-        "item_count": len(order_items_to_create),
-        "has_chitty": bool(order_data.list_image_url),
-    })
+    # 8. 🔔 Push notification to the MERCHANT (persisted + WebSocket)
+    await send_notification(
+        user_id=str(shop.owner_id),
+        title="🛒 New Order Received!",
+        body=f"Order from {current_user.full_name} — {len(order_items_to_create)} item(s), ₹{new_order.total_amount:.2f}",
+        notification_type="new_order",
+        data={
+            "order_id": str(new_order.id),
+            "customer_name": current_user.full_name,
+            "order_type": new_order.order_type,
+            "scheduled_pickup_time": str(new_order.scheduled_pickup_time) if new_order.scheduled_pickup_time else None,
+            "total_amount": new_order.total_amount,
+            "item_count": len(order_items_to_create),
+            "has_chitty": bool(order_data.list_image_urls),
+        },
+        db=db,
+    )
 
     return new_order
 
 # ==========================================
-# GET ALL ORDERS FOR A SPECIFIC SHOP
+# GET ALL ORDERS FOR MERCHANTS'S SHOP
 # ==========================================
-@router.get("/shop/{shop_id}", response_model=List[OrderResponse])
-def get_shop_orders(
-    shop_id: str,
+@router.get("/merchant", response_model=PaginatedOrderResponse)
+def get_merchant_orders(
     order_type: Optional[str] = Query(None, description="Filter by order type: instant or pre_order"),
     order_status: Optional[str] = Query(None, alias="status", description="Filter by status: pending, confirmed, etc."),
+    skip: int = Query(0, description="Number of orders to skip (for pagination)"),
+    limit: int = Query(20, description="Maximum number of orders to return"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)  # <--- Require Token
 ):
@@ -153,13 +167,13 @@ def get_shop_orders(
             detail="Not authorized. Merchant access required."
         )
 
-    # 2. Verify the shop exists
-    shop = db.query(Shop).filter(Shop.id == shop_id).first()
+    # 2. Derive the shop from the merchant's user ID
+    shop = db.query(Shop).filter(Shop.owner_id == current_user.id).first()
     if not shop:
-        raise HTTPException(status_code=404, detail="Shop not found")
+        raise HTTPException(status_code=404, detail="No shop found for this merchant account.")
         
     # 3. Build query with optional filters
-    query = db.query(Order).filter(Order.shop_id == shop_id)
+    query = db.query(Order).filter(Order.shop_id == shop.id)
 
     if order_type:
         if order_type not in VALID_ORDER_TYPES:
@@ -171,8 +185,19 @@ def get_shop_orders(
             raise HTTPException(status_code=400, detail=f"Invalid status filter. Must be one of: {VALID_STATUSES}")
         query = query.filter(Order.status == order_status)
 
-    orders = query.order_by(Order.created_at.desc()).all()
-    return orders
+    import math
+    total_count = query.count()
+    total_pages = math.ceil(total_count / limit) if limit > 0 else 1
+    current_page = (skip // limit) + 1 if limit > 0 else 1
+
+    orders = query.order_by(Order.created_at.desc()).offset(skip).limit(limit).all()
+    
+    return {
+        "data": orders,
+        "total_count": total_count,
+        "total_pages": total_pages,
+        "current_page": current_page
+    }
 
 # ==========================================
 # UPDATE ORDER STATUS & FINAL AMOUNT (Protected + WebSocket Push)
@@ -203,7 +228,29 @@ async def update_order(
                 status_code=400,
                 detail=f"Invalid status '{update_data.status}'. Must be one of: {VALID_STATUSES}"
             )
-        order.status = update_data.status
+        
+        # --- Strict State Machine Enforcement ---
+        current_status = order.status
+        new_status = update_data.status
+        
+        # Define allowed next states map
+        ALLOWED_TRANSITIONS = {
+            "pending": ["confirmed", "cancelled"],
+            "confirmed": ["preparing", "ready", "cancelled"],
+            "preparing": ["ready"],
+            "ready": ["picked_up", "delivered"],
+            "picked_up": [], 
+            "delivered": [],
+            "cancelled": []
+        }
+        
+        if new_status not in ALLOWED_TRANSITIONS.get(current_status, []):
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid status transition from '{current_status}' to '{new_status}'."
+            )
+            
+        order.status = new_status
         
     if update_data.total_amount is not None:
         order.total_amount = update_data.total_amount
@@ -215,28 +262,43 @@ async def update_order(
     db.commit()
     db.refresh(order)
     
-    # 5. 🔔 Push real-time update to the CUSTOMER via WebSocket!
+    # 5. 🔔 Push notification to the CUSTOMER (persisted + WebSocket)
     if update_data.status == "ready":
-        # Special pickup-ready notification
-        await manager.send_to_user(str(order.customer_id), {
-            "type": "pickup_ready",
-            "order_id": str(order.id),
-            "shop_id": str(order.shop_id),
-            "status": order.status,
-            "estimated_preparation_minutes": order.estimated_preparation_minutes,
-            "message": "Your order is ready for pickup!",
-        })
-    else:
-        # Standard order update (confirmed, preparing, etc.)
-        await manager.send_to_user(str(order.customer_id), {
-            "type": "order_update",
-            "order_id": str(order.id),
-            "shop_id": str(order.shop_id),
-            "status": order.status,
-            "total_amount": order.total_amount,
-            "estimated_preparation_minutes": order.estimated_preparation_minutes,
-            "updated_at": str(order.created_at),
-        })
+        await send_notification(
+            user_id=str(order.customer_id),
+            title="✅ Order Ready for Pickup!",
+            body=f"Your order is ready! Head to the shop to pick it up.",
+            notification_type="pickup_ready",
+            data={
+                "order_id": str(order.id),
+                "shop_id": str(order.shop_id),
+                "status": order.status,
+                "estimated_preparation_minutes": order.estimated_preparation_minutes,
+            },
+            db=db,
+        )
+    elif update_data.status is not None:
+        status_messages = {
+            "confirmed": "Your order has been confirmed by the shop!",
+            "preparing": "Your order is being prepared.",
+            "picked_up": "Your order has been picked up.",
+            "delivered": "Your order has been delivered. Enjoy!",
+            "cancelled": "Your order has been cancelled.",
+        }
+        await send_notification(
+            user_id=str(order.customer_id),
+            title=f"📦 Order {update_data.status.replace('_', ' ').title()}",
+            body=status_messages.get(update_data.status, f"Order status updated to: {update_data.status}"),
+            notification_type="order_update",
+            data={
+                "order_id": str(order.id),
+                "shop_id": str(order.shop_id),
+                "status": order.status,
+                "total_amount": order.total_amount,
+                "estimated_preparation_minutes": order.estimated_preparation_minutes,
+            },
+            db=db,
+        )
     
     return order
 

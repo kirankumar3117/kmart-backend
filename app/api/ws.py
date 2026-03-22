@@ -9,25 +9,31 @@ router = APIRouter()
 # Customers connect here to receive real-time order updates.
 #
 # Frontend usage (React Native / JavaScript):
-#   const ws = new WebSocket("ws://localhost:8000/ws/orders/<user-uuid>");
+#   const ws = new WebSocket("ws://localhost:8000/api/v1/ws/orders/customer/<user-uuid>");
 #   ws.onmessage = (event) => {
 #       const data = JSON.parse(event.data);
 #       console.log("Order update:", data);
 #   };
 # ==========================================
-@router.websocket("/orders/{user_id}")
-async def websocket_order_updates(websocket: WebSocket, user_id: str):
+
+async def handle_websocket(websocket: WebSocket, user_id: str):
     # 1. Register this connection under the user's ID
     await manager.connect(websocket, user_id)
-    
     try:
-        # 2. Keep the connection alive — listen for any incoming messages
-        #    (We don't really need client messages, but we must keep the loop
-        #     running so FastAPI doesn't close the socket)
+        # Keep connection alive
         while True:
-            # Wait for a message from the client (ping/keepalive)
             await websocket.receive_text()
-            
     except WebSocketDisconnect:
-        # 3. Client disconnected — clean up
         manager.disconnect(websocket, user_id)
+
+
+@router.websocket("/orders/customer/{user_id}")
+async def websocket_customer_order_updates(websocket: WebSocket, user_id: str):
+    """Endpoint for customers to receive order updates."""
+    await handle_websocket(websocket, user_id)
+
+
+@router.websocket("/orders/merchant/{user_id}")
+async def websocket_merchant_order_updates(websocket: WebSocket, user_id: str):
+    """Endpoint for merchants to receive new orders."""
+    await handle_websocket(websocket, user_id)
