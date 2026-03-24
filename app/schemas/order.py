@@ -71,6 +71,7 @@ class OrderCreate(BaseModel):
 
 class OrderResponse(BaseModel):
     id: UUID
+    order_number: int
     customer_id: UUID
     shop_id: UUID
     total_amount: float
@@ -88,6 +89,7 @@ class OrderResponse(BaseModel):
         "json_schema_extra": {
             "example": {
                 "id": "0dd014db-932d-434c-aa65-e661f145d866",
+                "order_number": 100001,
                 "customer_id": "554c58ce-0d6c-4c26-ba22-7c80f4d2d0e4",
                 "shop_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
                 "total_amount": 120.50,

@@ -22,7 +22,7 @@ router = APIRouter()
 # VALID ORDER TYPES & STATUSES
 # ==========================================
 VALID_ORDER_TYPES = {"instant", "pre_order"}
-VALID_STATUSES = {"pending", "confirmed", "preparing", "ready", "picked_up", "delivered", "cancelled"}
+VALID_STATUSES = {"pending", "confirmed", "preparing", "ready", "picked_up", "delivered", "cancelled", "rejected"}
 
 
 @router.post("/", response_model=OrderResponse)
@@ -200,6 +200,38 @@ def get_merchant_orders(
     }
 
 # ==========================================
+# GET SINGLE ORDER BY ID (Merchant Only)
+# ==========================================
+@router.get("/{order_id}", response_model=OrderResponse)
+def get_order_by_id(
+    order_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    # 1. Role check
+    if current_user.role != "merchant":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized. Merchant access required."
+        )
+
+    # 2. Find the order
+    order = db.query(Order).filter(Order.id == order_id).first()
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    # 3. Verify the merchant owns the shop that received this order
+    shop = db.query(Shop).filter(Shop.id == order.shop_id, Shop.owner_id == current_user.id).first()
+    if not shop:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You are not authorized to view this order."
+        )
+
+    return order
+
+
+# ==========================================
 # UPDATE ORDER STATUS & FINAL AMOUNT (Protected + WebSocket Push)
 # ==========================================
 @router.patch("/{order_id}", response_model=OrderResponse)
@@ -235,13 +267,14 @@ async def update_order(
         
         # Define allowed next states map
         ALLOWED_TRANSITIONS = {
-            "pending": ["confirmed", "cancelled"],
+            "pending": ["confirmed", "preparing", "rejected"],
             "confirmed": ["preparing", "ready", "cancelled"],
             "preparing": ["ready"],
             "ready": ["picked_up", "delivered"],
             "picked_up": [], 
             "delivered": [],
-            "cancelled": []
+            "cancelled": [],
+            "rejected": []
         }
         
         if new_status not in ALLOWED_TRANSITIONS.get(current_status, []):
@@ -284,6 +317,7 @@ async def update_order(
             "picked_up": "Your order has been picked up.",
             "delivered": "Your order has been delivered. Enjoy!",
             "cancelled": "Your order has been cancelled.",
+            "rejected": "Your order has been rejected by the shop.",
         }
         await send_notification(
             user_id=str(order.customer_id),
@@ -315,6 +349,64 @@ def get_my_orders(
     orders = db.query(Order).filter(Order.customer_id == current_user.id).order_by(Order.created_at.desc()).all()
     
     return orders
+
+
+# ==========================================
+# CANCEL PENDING ORDER (Customer Only)
+# ==========================================
+@router.post("/{order_id}/cancel", response_model=OrderResponse)
+async def cancel_order(
+    order_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    # 1. Role Check
+    if current_user.role != "customer":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only customers can cancel their orders."
+        )
+
+    # 2. Find the order
+    order = db.query(Order).filter(Order.id == order_id).first()
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    # 3. Verify ownership
+    if order.customer_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You are not authorized to cancel this order."
+        )
+
+    # 4. Only pending orders can be cancelled by customers
+    if order.status != "pending":
+        raise HTTPException(
+            status_code=400,
+            detail="Only pending orders can be cancelled."
+        )
+
+    # 5. Update Status
+    order.status = "cancelled"
+    db.commit()
+    db.refresh(order)
+
+    # 6. Notify the merchant
+    shop = db.query(Shop).filter(Shop.id == order.shop_id).first()
+    if shop:
+        await send_notification(
+            user_id=str(shop.owner_id),
+            title="🚫 Order Cancelled",
+            body=f"Order has been cancelled by the customer.",
+            notification_type="order_cancelled",
+            data={
+                "order_id": str(order.id),
+                "status": order.status,
+            },
+            db=db,
+        )
+
+    return order
 
 
 # ==========================================

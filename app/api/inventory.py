@@ -77,9 +77,9 @@ def get_merchant_inventory(skip: int = 0, limit: int = 100, db: Session = Depend
     response_items = []
     for inv, prod in results:
         response_items.append({
-            "inventory_id": inv.id,
+            "id": inv.id,
             "product_id": prod.id,
-            "product_name": prod.name,
+            "name": prod.name,
             # We don't join category here to save speed, the UI usually just needs the name/image
             "category": None, 
             "image_url": prod.image_url,

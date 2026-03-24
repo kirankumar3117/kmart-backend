@@ -29,9 +29,9 @@ class InventoryUpdate(BaseModel):
 # 5. Joined response: Product details + shop-specific price/stock
 #    Used by GET /shops/{shop_id}/items
 class ShopItemResponse(BaseModel):
-    inventory_id: UUID       # InventoryItem.id
+    id: UUID       # InventoryItem.id
     product_id: UUID
-    product_name: str
+    name: str
     category: Optional[str] = None
     image_url: Optional[str] = None
     mrp: float              # Max Retail Price (from master catalog)

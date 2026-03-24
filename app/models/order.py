@@ -1,5 +1,5 @@
 import uuid
-from sqlalchemy import Column, Integer, Float, String, ForeignKey, DateTime, Text
+from sqlalchemy import Column, Integer, Float, String, ForeignKey, DateTime, Text, Identity
 from sqlalchemy.dialects.postgresql import UUID, JSON
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
@@ -9,6 +9,7 @@ class Order(Base):
     __tablename__ = "orders"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    order_number = Column(Integer, Identity(start=100000, cycle=False), unique=True, index=True)
     customer_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     shop_id = Column(UUID(as_uuid=True), ForeignKey("shops.id"), nullable=False)
     
