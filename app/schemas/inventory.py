@@ -6,6 +6,7 @@ from uuid import UUID
 class InventoryBase(BaseModel):
     price: float
     stock: int
+    in_stock: bool = True
 
 # 2. What the frontend sends when adding an item to the store
 class InventoryCreate(InventoryBase):
@@ -25,6 +26,7 @@ class InventoryResponse(InventoryBase):
 class InventoryUpdate(BaseModel):
     price: Optional[float] = None
     stock: Optional[int] = None
+    in_stock: Optional[bool] = None
 
 # 5. Joined response: Product details + shop-specific price/stock
 #    Used by GET /shops/{shop_id}/items
@@ -38,5 +40,6 @@ class ShopItemResponse(BaseModel):
     unit: Optional[str] = None
     price: float            # This shop's selling price
     stock: int              # This shop's current stock
+    in_stock: bool          # Merchant explicitly set status
     class Config:
         from_attributes = True

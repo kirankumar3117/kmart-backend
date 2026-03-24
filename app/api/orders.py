@@ -79,10 +79,10 @@ async def create_order(
                 if not inventory_item:
                     raise HTTPException(status_code=400, detail=f"Product ID {item.product_id} is not sold here.")
                 
-                if inventory_item.stock < item.quantity:
-                    raise HTTPException(status_code=400, detail=f"Not enough stock for Product ID {item.product_id}.")
+                # Only block if merchant explicitly marked it out of stock
+                if not inventory_item.in_stock:
+                    raise HTTPException(status_code=400, detail=f"Product ID {item.product_id} is currently out of stock.")
 
-                inventory_item.stock -= item.quantity
                 item_price = inventory_item.price
                 total_amount += (item_price * item.quantity)
             else:
