@@ -1,5 +1,5 @@
 import uuid
-from sqlalchemy import Column, Integer, Float, ForeignKey
+from sqlalchemy import Column, Integer, Float, ForeignKey, Boolean
 from sqlalchemy.dialects.postgresql import UUID
 from app.db.base import Base
 
@@ -15,3 +15,4 @@ class InventoryItem(Base):
     # Store-specific details
     price = Column(Float, nullable=False)  # The price this specific shop is charging
     stock = Column(Integer, default=0)     # How many items they have on the shelf
+    in_stock = Column(Boolean, default=True) # Merchant can mark out of stock regardless of physical stock

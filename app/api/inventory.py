@@ -86,7 +86,8 @@ def get_merchant_inventory(skip: int = 0, limit: int = 100, db: Session = Depend
             "mrp": prod.mrp,
             "unit": getattr(prod, 'unit', None), # fallback
             "price": inv.price,
-            "stock": inv.stock
+            "stock": inv.stock,
+            "in_stock": inv.in_stock
         })
         
     return response_items

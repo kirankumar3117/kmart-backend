@@ -210,6 +210,66 @@ def list_products(
 
 
 # ==========================================
+# 2.5 LIST PRODUCTS IN ANY INVENTORY (Customer Grocery View)
+# Returns products that are present in at least one online shop's inventory
+# ==========================================
+@router.get("/in-inventory", response_model=List[ProductResponse])
+def list_products_in_inventory(
+    search: Optional[str] = Query(None, description="Search by product name or subcategory name"),
+    category_id: Optional[str] = Query(None, description="Filter by category ID"),
+    subcategory_id: Optional[str] = Query(None, description="Filter by subcategory ID"),
+    in_stock_only: bool = Query(False, description="Only show products that are actually in stock"),
+    skip: int = 0,
+    limit: int = 100,
+    db: Session = Depends(get_db),
+):
+    query = db.query(Product).join(InventoryItem, Product.id == InventoryItem.product_id)\
+                 .join(Shop, InventoryItem.shop_id == Shop.id)\
+                 .filter(
+                     Product.is_active == True,
+                     Product.is_deleted == False,
+                     Shop.is_onboarded == True,
+                     Shop.is_online == True
+                 )
+
+    if search:
+        matching_subcategory_ids = (
+            db.query(ProductSubcategory.id)
+            .filter(
+                ProductSubcategory.name.ilike(f"%{search}%"),
+                ProductSubcategory.is_active == True,
+                ProductSubcategory.is_deleted == False,
+            )
+            .all()
+        )
+        matching_sub_ids = [s.id for s in matching_subcategory_ids]
+
+        from sqlalchemy import or_
+
+        if matching_sub_ids:
+            query = query.filter(
+                or_(
+                    Product.name.ilike(f"%{search}%"),
+                    Product.subcategory_id.in_(matching_sub_ids),
+                )
+            )
+        else:
+            query = query.filter(Product.name.ilike(f"%{search}%"))
+
+    if category_id:
+        query = query.join(product_category_link).filter(
+            product_category_link.c.category_id == category_id
+        )
+
+    if subcategory_id:
+        query = query.filter(Product.subcategory_id == subcategory_id)
+
+    if in_stock_only:
+        query = query.filter(
+            InventoryItem.in_stock == True
+        )
+
+    return query.distinct().offset(skip).limit(limit).all()# ==========================================
 # 3. GET SINGLE PRODUCT (Public)
 # ==========================================
 @router.get("/{product_id}", response_model=ProductResponse)
