@@ -4,6 +4,14 @@ from datetime import datetime
 from uuid import UUID
 
 # 1. The individual items in the cart
+class CustomerResponse(BaseModel):
+    id: UUID
+    full_name: str
+    phone_number: str
+
+    class Config:
+        from_attributes = True
+
 class OrderItemCreate(BaseModel):
     # Now Optional: If they upload a handwritten list, they might not send digital products!
     product_id: Optional[UUID] = None 
@@ -73,6 +81,7 @@ class OrderResponse(BaseModel):
     id: UUID
     order_number: int
     customer_id: UUID
+    customer: Optional[CustomerResponse] = None
     shop_id: UUID
     total_amount: float
     status: str
@@ -91,6 +100,11 @@ class OrderResponse(BaseModel):
                 "id": "0dd014db-932d-434c-aa65-e661f145d866",
                 "order_number": 100001,
                 "customer_id": "554c58ce-0d6c-4c26-ba22-7c80f4d2d0e4",
+                "customer": {
+                    "id": "554c58ce-0d6c-4c26-ba22-7c80f4d2d0e4",
+                    "full_name": "Kiran Kumar",
+                    "phone_number": "+919876543210"
+                },
                 "shop_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
                 "total_amount": 120.50,
                 "status": "pending",
@@ -122,12 +136,15 @@ class OrderUpdate(BaseModel):
     total_amount: Optional[float] = None
     # Shopkeeper sets how long to prepare the order
     estimated_preparation_minutes: Optional[int] = None
+    order_notes: Optional[str] = None
+    comment: Optional[str] = None
 
 class PaginatedOrderResponse(BaseModel):
     data: List[OrderResponse]
     total_count: int
     total_pages: int
     current_page: int
+    total_earning: float = 0.0
 
     model_config = {
         "json_schema_extra": {

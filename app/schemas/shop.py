@@ -24,6 +24,8 @@ class ShopResponse(ShopBase):
     onboarding_step: str = "registered"
     shop_image_url: Optional[str] = None
     owner_image_url: Optional[str] = None
+    total_earning: float = 0.0
+    today_earnings: float = 0.0
 
     class Config:
         from_attributes = True
