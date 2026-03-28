@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from typing import List, Optional
 from datetime import datetime, timezone
 from uuid import UUID
+from sqlalchemy import func
 
 from app.db.session import get_db
 from app.models.order import Order, OrderItem
@@ -192,11 +193,17 @@ def get_merchant_orders(
 
     orders = query.order_by(Order.created_at.desc()).offset(skip).limit(limit).all()
     
+    total_earning = db.query(func.sum(Order.total_amount)).filter(
+        Order.shop_id == shop.id,
+        Order.status.notin_(["cancelled", "rejected"])
+    ).scalar() or 0.0
+
     return {
         "data": orders,
         "total_count": total_count,
         "total_pages": total_pages,
-        "current_page": current_page
+        "current_page": current_page,
+        "total_earning": total_earning
     }
 
 # ==========================================
@@ -254,7 +261,8 @@ async def update_order(
         raise HTTPException(status_code=404, detail="Order not found")
 
     # 3. Validate the new status if provided
-    if update_data.status is not None:
+    status_changed = False
+    if update_data.status is not None and update_data.status != order.status:
         if update_data.status not in VALID_STATUSES:
             raise HTTPException(
                 status_code=400,
@@ -284,6 +292,7 @@ async def update_order(
             )
             
         order.status = new_status
+        status_changed = True
         
     if update_data.total_amount is not None:
         order.total_amount = update_data.total_amount
@@ -291,48 +300,54 @@ async def update_order(
     if update_data.estimated_preparation_minutes is not None:
         order.estimated_preparation_minutes = update_data.estimated_preparation_minutes
 
+    if update_data.order_notes is not None:
+        order.order_notes = update_data.order_notes
+    elif update_data.comment is not None:
+        order.order_notes = update_data.comment
+
     # 4. Save to database
     db.commit()
     db.refresh(order)
     
     # 5. 🔔 Push notification to the CUSTOMER (persisted + WebSocket)
-    if update_data.status == "ready":
-        await send_notification(
-            user_id=str(order.customer_id),
-            title="✅ Order Ready for Pickup!",
-            body=f"Your order is ready! Head to the shop to pick it up.",
-            notification_type="pickup_ready",
-            data={
-                "order_id": str(order.id),
-                "shop_id": str(order.shop_id),
-                "status": order.status,
-                "estimated_preparation_minutes": order.estimated_preparation_minutes,
-            },
-            db=db,
-        )
-    elif update_data.status is not None:
-        status_messages = {
-            "confirmed": "Your order has been confirmed by the shop!",
-            "preparing": "Your order is being prepared.",
-            "picked_up": "Your order has been picked up.",
-            "delivered": "Your order has been delivered. Enjoy!",
-            "cancelled": "Your order has been cancelled.",
-            "rejected": "Your order has been rejected by the shop.",
-        }
-        await send_notification(
-            user_id=str(order.customer_id),
-            title=f"📦 Order {update_data.status.replace('_', ' ').title()}",
-            body=status_messages.get(update_data.status, f"Order status updated to: {update_data.status}"),
-            notification_type="order_update",
-            data={
-                "order_id": str(order.id),
-                "shop_id": str(order.shop_id),
-                "status": order.status,
-                "total_amount": order.total_amount,
-                "estimated_preparation_minutes": order.estimated_preparation_minutes,
-            },
-            db=db,
-        )
+    if status_changed:
+        if update_data.status == "ready":
+            await send_notification(
+                user_id=str(order.customer_id),
+                title="✅ Order Ready for Pickup!",
+                body=f"Your order is ready! Head to the shop to pick it up.",
+                notification_type="pickup_ready",
+                data={
+                    "order_id": str(order.id),
+                    "shop_id": str(order.shop_id),
+                    "status": order.status,
+                    "estimated_preparation_minutes": order.estimated_preparation_minutes,
+                },
+                db=db,
+            )
+        else:
+            status_messages = {
+                "confirmed": "Your order has been confirmed by the shop!",
+                "preparing": "Your order is being prepared.",
+                "picked_up": "Your order has been picked up.",
+                "delivered": "Your order has been delivered. Enjoy!",
+                "cancelled": "Your order has been cancelled.",
+                "rejected": "Your order has been rejected by the shop.",
+            }
+            await send_notification(
+                user_id=str(order.customer_id),
+                title=f"📦 Order {update_data.status.replace('_', ' ').title()}",
+                body=status_messages.get(update_data.status, f"Order status updated to: {update_data.status}"),
+                notification_type="order_update",
+                data={
+                    "order_id": str(order.id),
+                    "shop_id": str(order.shop_id),
+                    "status": order.status,
+                    "total_amount": order.total_amount,
+                    "estimated_preparation_minutes": order.estimated_preparation_minutes,
+                },
+                db=db,
+            )
     
     return order
 

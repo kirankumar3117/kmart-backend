@@ -4,6 +4,8 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List
 from uuid import UUID
+from datetime import datetime, timezone
+from sqlalchemy import func
 
 from app.db.session import get_db
 from app.models.shop import Shop
@@ -28,6 +30,24 @@ def get_shop(db: Session = Depends(get_db), current_user: User = Depends(get_cur
     print("shop" , shop)
     if not shop:
         raise HTTPException(status_code=404, detail="Shop not found")
+        
+    # Calculate Earnings
+    total_earning = db.query(func.sum(Order.total_amount)).filter(
+        Order.shop_id == shop.id,
+        Order.status.notin_(["cancelled", "rejected"])
+    ).scalar() or 0.0
+
+    now = datetime.now(timezone.utc)
+    start_of_today = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    today_earnings = db.query(func.sum(Order.total_amount)).filter(
+        Order.shop_id == shop.id,
+        Order.status.notin_(["cancelled", "rejected"]),
+        Order.created_at >= start_of_today
+    ).scalar() or 0.0
+
+    setattr(shop, 'total_earning', total_earning)
+    setattr(shop, 'today_earnings', today_earnings)
+
     return shop
 
 

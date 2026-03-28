@@ -29,6 +29,7 @@ class Order(Base):
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     items = relationship("OrderItem", backref="order")
+    customer = relationship("User", foreign_keys=[customer_id], lazy="joined")
 
 class OrderItem(Base):
     __tablename__ = "order_items"
