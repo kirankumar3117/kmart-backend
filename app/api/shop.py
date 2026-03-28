@@ -9,9 +9,10 @@ from sqlalchemy import func
 
 from app.db.session import get_db
 from app.models.shop import Shop
+from app.models.product_category import ProductCategory
 from app.models.user import User
 from app.models.order import Order
-from app.schemas.shop import ShopResponse
+from app.schemas.shop import ShopResponse, ShopUpdate
 from app.services.notification_service import send_notification
 
 router = APIRouter()
@@ -52,42 +53,67 @@ def get_shop(db: Session = Depends(get_db), current_user: User = Depends(get_cur
 
 
 # ==========================================
-# UPDATE SHOP (Private)
+# UPDATE SHOP (Private - Partial)
 # ==========================================
-@router.put("/", response_model=ShopResponse)
+@router.patch("/", response_model=ShopResponse)
 async def update_shop(
-    status_update: ShopStatusUpdate,
+    body: ShopUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)):
+    current_user: User = Depends(get_current_user)
+):
     # 1. Role-Based Check: Are they a merchant?
     if current_user.role != "merchant":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN, 
             detail="Not authorized. Merchant access required."
         )
+    
     shop = db.query(Shop).filter(Shop.owner_id == current_user.id).first()
     if not shop:
         raise HTTPException(status_code=404, detail="Shop not found")
+
+    update_data = body.model_dump(exclude_unset=True)
     
-    # 3. Update the shop with the value from the frontend
-    old_status = shop.is_online
-    shop.is_online = status_update.is_online
-    
-    # NEW logic: If going offline, reject all "pending" orders
+    # Handle status change logic (offline rejections)
     pending_orders = []
-    if old_status and not status_update.is_online:
-        pending_orders = db.query(Order).filter(
-            Order.shop_id == shop.id,
-            Order.status == "pending"
-        ).all()
+    if "is_online" in update_data:
+        old_status = shop.is_online
+        new_status = update_data["is_online"]
         
-        for order in pending_orders:
-            order.status = "rejected"
+        if old_status and not new_status:
+            # Going offline: reject pending orders
+            pending_orders = db.query(Order).filter(
+                Order.shop_id == shop.id,
+                Order.status == "pending"
+            ).all()
             
+            for order in pending_orders:
+                order.status = "rejected"
+    
+    
+    # Apply special update: Product Categories
+    if "product_category_ids" in update_data:
+        pc_ids = update_data.pop("product_category_ids")
+        if pc_ids is not None:
+            product_cats = db.query(ProductCategory).filter(ProductCategory.id.in_(pc_ids)).all()
+            if len(product_cats) != len(pc_ids):
+                raise HTTPException(status_code=400, detail="One or more Product Category IDs are invalid.")
+            shop.product_categories = product_cats
+            
+    # Apply standard updates
+    if "category_id" in update_data and current_user.role != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, 
+            detail="Only admins can change the shop category (shop type)."
+        )
+        
+    for key, value in update_data.items():
+        setattr(shop, key, value)
+
     db.commit()
     db.refresh(shop)
 
-    # Trigger notifications for rejected orders after commit to ensure state is saved
+    # Trigger notifications for rejected orders
     if pending_orders:
         for order in pending_orders:
             await send_notification(

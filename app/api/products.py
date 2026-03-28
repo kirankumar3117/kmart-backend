@@ -30,7 +30,7 @@ def _check_product_access(product: Product, current_user: User):
             detail="Only merchants and admins can manage products.",
         )
 
-    if product.merchant_id != current_user.id:
+    if product.created_by_id != current_user.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You can only manage your own products.",

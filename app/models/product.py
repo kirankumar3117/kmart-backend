@@ -13,8 +13,8 @@ class Product(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
 
-    # Ownership: which merchant created this product
-    merchant_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    # Ownership: which user (merchant or admin) created this product
+    created_by_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
 
     # Core Info
     name = Column(String, index=True, nullable=False)       # e.g. "Aashirvaad Atta"
