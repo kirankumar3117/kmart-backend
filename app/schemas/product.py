@@ -52,7 +52,7 @@ class ProductUpdate(BaseModel):
 # Schema for READING a product (Output)
 class ProductResponse(BaseModel):
     id: UUID
-    merchant_id: UUID
+    created_by_id: UUID
     name: str
     description: Optional[str] = None
     image_url: Optional[str] = None

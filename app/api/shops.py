@@ -7,7 +7,10 @@ from app.db.session import get_db
 from app.models.shop import Shop
 from app.models.inventory import InventoryItem
 from app.models.product import Product
-from app.schemas.shop import ShopResponse, ShopNearbyResponse
+from app.models.product_category import ProductCategory
+from app.models.user import User
+from app.utils.auth import get_current_user
+from app.schemas.shop import ShopResponse, ShopNearbyResponse, ShopUpdate
 from app.schemas.inventory import ShopItemResponse
 
 router = APIRouter()
@@ -115,6 +118,48 @@ def get_nearby_shops(
 # GET ALL SHOPS (Public: Customers need to see shops!)
 # ==========================================
 @router.get("/", response_model=List[ShopResponse])
+@router.get("/", response_model=List[ShopResponse])
 def get_shops(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     shops = db.query(Shop).offset(skip).limit(limit).all()
     return shops
+
+# ==========================================
+# UPDATE SHOP (Admin Only)
+# ==========================================
+@router.patch("/{shop_id}", response_model=ShopResponse)
+def update_shop_as_admin(
+    shop_id: str,
+    body: ShopUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    # 1. Admin only
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required.")
+
+    # 2. Find the shop
+    shop = db.query(Shop).filter(Shop.id == shop_id).first()
+    if not shop:
+        raise HTTPException(status_code=404, detail="Shop not found")
+
+    # 3. Apply updates
+    update_data = body.model_dump(exclude_unset=True)
+    
+    # 3a. Update Product Categories directly on the shop
+    if "product_category_ids" in update_data:
+        pc_ids = update_data.pop("product_category_ids")
+        if pc_ids is not None:
+            product_cats = db.query(ProductCategory).filter(ProductCategory.id.in_(pc_ids)).all()
+            if len(product_cats) != len(pc_ids):
+                raise HTTPException(status_code=400, detail="One or more Product Category IDs are invalid.")
+            shop.product_categories = product_cats
+            
+    # We ignore the offline/rejection logic here because Admins usually just fix metadata.
+    # If admins also need to trigger offline rejection, we could add that logic here too.
+    for key, value in update_data.items():
+        setattr(shop, key, value)
+
+    db.commit()
+    db.refresh(shop)
+
+    return shop

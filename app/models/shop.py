@@ -1,9 +1,18 @@
 import uuid
 import enum
-from sqlalchemy import Column, String, Boolean, Text, Float, ForeignKey, DateTime, Enum
+from sqlalchemy import Column, String, Boolean, Text, Float, ForeignKey, DateTime, Enum, Table
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.sql import func
+from sqlalchemy.orm import relationship
 from app.db.base import Base
+
+# Association table for Shop <-> ProductCategory
+shop_product_categories = Table(
+    "shop_product_categories",
+    Base.metadata,
+    Column("shop_id", UUID(as_uuid=True), ForeignKey("shops.id", ondelete="CASCADE"), primary_key=True),
+    Column("product_category_id", UUID(as_uuid=True), ForeignKey("product_categories.id", ondelete="CASCADE"), primary_key=True)
+)
 
 
 class OnboardingStep(str, enum.Enum):
@@ -27,8 +36,12 @@ class Shop(Base):
     # User linking — now UUID
     owner_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
 
-    # Category linking
+    # Category linking (Shop Type)
     category_id = Column(UUID(as_uuid=True), ForeignKey("shop_categories.id"), nullable=True)
+    category = relationship("ShopCategory", backref="shops", lazy="joined")
+
+    # Direct Product Category linking (What this specific shop sells)
+    product_categories = relationship("ProductCategory", secondary=shop_product_categories, backref="assigned_shops", lazy="subquery")
 
     # Linked to the agent who verified this shop
     agent_id = Column(UUID(as_uuid=True), ForeignKey("agents.id"), nullable=True)
