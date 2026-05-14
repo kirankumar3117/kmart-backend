@@ -1,2 +1,12 @@
 venv
 .venv
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Node
+package-lock.json
+node_modules/

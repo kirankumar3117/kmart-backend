@@ -9,3 +9,5 @@ Pillow
 alembic
 python-multipart
 PyJWT
+bcrypt
+pydantic[email]

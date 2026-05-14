@@ -1,18 +1,15 @@
 from datetime import datetime, timedelta, timezone
+import bcrypt
 import jwt
-from passlib.context import CryptContext
 from app.core.config import settings
 
-# Tells passlib we want to use the industry-standard bcrypt hashing algorithm
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-# 1. Scramble the password before saving to the database
 def get_password_hash(password: str) -> str:
-    return pwd_context.hash(password)
+    return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
 
-# 2. Check if the plain password matches the scrambled one in the database
+
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    return pwd_context.verify(plain_password, hashed_password)
+    return bcrypt.checkpw(plain_password.encode("utf-8"), hashed_password.encode("utf-8"))
 
 # 3. Create the Digital ID Card (JWT Access Token)
 def create_access_token(data: dict) -> str:

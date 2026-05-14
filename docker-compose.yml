@@ -3,11 +3,11 @@ version: "3.8"
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: kmart_db_container
+    container_name: kiggidi_db_container
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: admin123
-      POSTGRES_DB: kmart_db
+      POSTGRES_DB: kiggidi
     ports:
       - "5434:5432"
     volumes:
